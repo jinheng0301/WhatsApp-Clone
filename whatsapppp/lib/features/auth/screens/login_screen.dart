@@ -42,44 +42,50 @@ class _LoginScreenState extends State<LoginScreen> {
         elevation: 0,
         backgroundColor: backgroundColor,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'WhatsApp will send an SMS message to verify your phone number.',
-            ),
-            SizedBox(height: 20),
-            TextButton(
-              onPressed: () => pickCountry(),
-              child: Text('Pick a country'),
-            ),
-            SizedBox(height: 20),
-            Row(
-              children: [
-                country != null ? Text('+${country!.phoneCode}') : Container(),
-                SizedBox(width: 10),
-                SizedBox(
-                  width: size.width / 0.7,
-                  child: TextField(
-                    controller: phoneController,
-                    decoration: InputDecoration(
-                      hintText: 'Phone number',
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'WhatsApp will send an SMS message to verify your phone number.',
+              ),
+              SizedBox(height: 20),
+              TextButton(
+                onPressed: () => pickCountry(),
+                child: Text('Pick a country'),
+              ),
+              SizedBox(height: 20),
+              Row(
+                children: [
+                  country != null
+                      ? Text('+${country!.phoneCode}')
+                      : Container(),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      width: size.width / 0.7,
+                      child: TextField(
+                        controller: phoneController,
+                        decoration: InputDecoration(
+                          hintText: 'Phone number',
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: size.height * 0.6),
-            SizedBox(
-              width: 90,
-              child: CustomButton(
-                onPressed: () {},
-                text: 'NEXT',
+                ],
               ),
-            ),
-          ],
+              SizedBox(height: size.height / 2),
+              SizedBox(
+                width: 90,
+                child: CustomButton(
+                  onPressed: () {},
+                  text: 'NEXT',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
