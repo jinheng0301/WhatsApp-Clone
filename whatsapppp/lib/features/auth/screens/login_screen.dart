@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void sendPhoneNumber() {
-    print('go to otp scrren');
+    print('go to otp screen');
     String phoneNumber = phoneController.text.trim();
     if (country != null && phoneNumber.isNotEmpty) {
       // Provider ref -> interact provider with provider

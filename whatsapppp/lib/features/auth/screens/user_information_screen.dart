@@ -1,16 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 
-class UserInformationScreen extends StatefulWidget {
+class UserInformationScreen extends ConsumerStatefulWidget {
   static const String routeName = '/user-information-screen';
   const UserInformationScreen({super.key});
 
   @override
-  State<UserInformationScreen> createState() => _UserInformationScreenState();
+  ConsumerState<UserInformationScreen> createState() =>
+      _UserInformationScreenState();
 }
 
-class _UserInformationScreenState extends State<UserInformationScreen> {
+class _UserInformationScreenState extends ConsumerState<UserInformationScreen> {
   final TextEditingController nameController = TextEditingController();
   File? image;
 
@@ -25,6 +28,18 @@ class _UserInformationScreenState extends State<UserInformationScreen> {
   void selectImage() async {
     image = await pickImageFromGallery(context);
     setState(() {});
+  }
+
+  void storUserData() {
+    String name = nameController.text.trim();
+
+    if (name.isNotEmpty) {
+      ref.read(authControllerProvider).saveUserDataToFirebase(
+            context,
+            name,
+            image,
+          );
+    }
   }
 
   @override
@@ -53,7 +68,7 @@ class _UserInformationScreenState extends State<UserInformationScreen> {
                     bottom: -10,
                     left: 80,
                     child: IconButton(
-                      onPressed: () {},
+                      onPressed: selectImage,
                       icon: Icon(Icons.add_a_photo),
                     ),
                   )
@@ -72,7 +87,7 @@ class _UserInformationScreenState extends State<UserInformationScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: selectImage,
+                    onPressed: storUserData,
                     icon: Icon(Icons.done),
                   )
                 ],

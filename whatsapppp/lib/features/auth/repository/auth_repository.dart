@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod/riverpod.dart';
+import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/features/auth/screens/otp_screen.dart';
 import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
+import 'package:whatsapppp/models/user_model.dart';
+import 'package:whatsapppp/screens/mobile_layout_screen.dart';
 
 final authRepossitoryProvider = Provider(
   (ref) => AuthRepository(
@@ -65,6 +70,47 @@ class AuthRepository {
       Navigator.pushNamedAndRemoveUntil(
         context,
         UserInformationScreen.routeName,
+        (route) => false,
+      );
+    } catch (e) {
+      showSnackBar(context, e.toString());
+    }
+  }
+
+  void saveUserDataToFirebase({
+    required String name,
+    required File? profilePic,
+    required Ref ref,
+    required BuildContext context,
+  }) async {
+    try {
+      String uid = auth.currentUser!.uid;
+      String photoUrl =
+          'https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__480.jpg';
+
+      // overwrite the photoUrl if the user has selected the profile pic
+      if (profilePic != null) {
+        photoUrl = await ref
+            .read(CommonFirebaseStorageRepositoryProvider)
+            .storeFileToFirebase('profilePic/$uid', profilePic);
+      }
+
+      var user = UserModel(
+        name: name,
+        uid: uid,
+        profilePic: photoUrl,
+        isOnline: true,
+        phoneNumber: auth.currentUser!.uid,
+        groupId: [],
+      );
+
+      await firestore.collection('users').doc(uid).set(user.toMap());
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MobileLayoutScreen(),
+        ),
         (route) => false,
       );
     } catch (e) {

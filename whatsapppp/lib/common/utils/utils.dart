@@ -20,7 +20,7 @@ Future<File?> pickImageFromGallery(BuildContext context) async {
       source: ImageSource.gallery,
     );
 
-    // checking if picture i not equal to null
+    // checking if picture is not equal to null
     // converting the image to file
     if (pickedImage != null) {
       image = File(pickedImage.path);
