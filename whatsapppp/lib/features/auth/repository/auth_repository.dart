@@ -11,7 +11,7 @@ import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
 import 'package:whatsapppp/screens/mobile_layout_screen.dart';
 
-final authRepossitoryProvider = Provider(
+final authRepositoryProvider = Provider(
   (ref) => AuthRepository(
     auth: FirebaseAuth.instance,
     firestore: FirebaseFirestore.instance,
@@ -97,6 +97,7 @@ class AuthRepository {
   }) async {
     try {
       String uid = auth.currentUser!.uid;
+      String phoneNumber = auth.currentUser!.phoneNumber!;
       String photoUrl =
           'https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__480.jpg';
 
@@ -112,7 +113,7 @@ class AuthRepository {
         uid: uid,
         profilePic: photoUrl,
         isOnline: true,
-        phoneNumber: auth.currentUser!.uid,
+        phoneNumber: phoneNumber,
         groupId: [],
       );
 

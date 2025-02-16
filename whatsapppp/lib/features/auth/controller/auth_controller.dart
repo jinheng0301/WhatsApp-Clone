@@ -6,7 +6,7 @@ import 'package:whatsapppp/features/auth/repository/auth_repository.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
 final authControllerProvider = Provider((ref) {
-  final authRepository = ref.watch(authRepossitoryProvider);
+  final authRepository = ref.watch(authRepositoryProvider);
   return AuthController(
     authRepository: authRepository,
     ref: ref,
