@@ -27,6 +27,18 @@ class AuthRepository {
     required this.firestore,
   });
 
+  Future<UserModel?> getCurrentUserData() async {
+    var userData =
+        await firestore.collection('users').doc(auth.currentUser?.uid).get();
+
+    UserModel? user;
+    if (userData.data() != null) {
+      user = UserModel.fromMap(userData.data()!);
+    }
+
+    return user;
+  }
+
   // verify phone number which will take input from the phone number and then send the OTP to the phone number
   // after otp has matches that the user has entered, then the user will be signed in
   // just like sign in with email and password

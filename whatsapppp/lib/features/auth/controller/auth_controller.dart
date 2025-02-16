@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:whatsapppp/features/auth/repository/auth_repository.dart';
+import 'package:whatsapppp/models/user_model.dart';
 
 final authControllerProvider = Provider((ref) {
   final authRepository = ref.watch(authRepossitoryProvider);
@@ -10,6 +11,11 @@ final authControllerProvider = Provider((ref) {
     authRepository: authRepository,
     ref: ref,
   );
+});
+
+final userDataAuthProvider = FutureProvider((ref) {
+  final authController = ref.watch(authControllerProvider);
+  return authController.getUserData();
 });
 
 class AuthController {
@@ -20,6 +26,12 @@ class AuthController {
     required this.authRepository,
     required this.ref,
   });
+
+  // get user data from firebase
+  Future<UserModel?> getUserData() async {
+    UserModel? user = await authRepository.getCurrentUserData();
+    return user;
+  }
 
   void signInWithPhone(BuildContext context, String phoneNumber) {
     authRepository.signInWithPhone(context, phoneNumber);

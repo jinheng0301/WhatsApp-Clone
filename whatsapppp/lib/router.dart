@@ -4,6 +4,7 @@ import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/features/auth/screens/otp_screen.dart';
 import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
+import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 
 Route<dynamic> onGenerateRoute(RouteSettings settings) {
   switch (settings.name) {
@@ -31,6 +32,11 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
     case UserInformationScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => UserInformationScreen(),
+      );
+
+    case SelectContactScreens.routeName:
+      return MaterialPageRoute(
+        builder: (_) => SelectContactScreens(),
       );
 
     // error screen
