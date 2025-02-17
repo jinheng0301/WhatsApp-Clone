@@ -33,19 +33,48 @@ class AuthController {
     return user;
   }
 
-  void signInWithPhone(BuildContext context, String phoneNumber) {
-    authRepository.signInWithPhone(context, phoneNumber);
+  // void signInWithPhone(BuildContext context, String phoneNumber) {
+  //   authRepository.signInWithPhone(context, phoneNumber);
+  // }
+
+  // void verifyOTP({
+  //   required BuildContext context,
+  //   required String verificationId,
+  //   required String userOTP,
+  // }) {
+  //   authRepository.verifyOTP(
+  //     context: context,
+  //     verificationId: verificationId,
+  //     userOTP: userOTP,
+  //   );
+  // }
+
+  Future<void> signUpWithEmail({
+    required String email,
+    required String password,
+    required String name,
+    required BuildContext context,
+    File? profilePic,
+  }) async {
+    await authRepository.signUpWithEmail(
+      email: email,
+      password: password,
+      name: name,
+      context: context,
+      profilePic: profilePic,
+      ref: ref,
+    );
   }
 
-  void verifyOTP({
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
     required BuildContext context,
-    required String verificationId,
-    required String userOTP,
-  }) {
-    authRepository.verifyOTP(
+  }) async {
+    await authRepository.signInWithEmail(
+      email: email,
+      password: password,
       context: context,
-      verificationId: verificationId,
-      userOTP: userOTP,
     );
   }
 

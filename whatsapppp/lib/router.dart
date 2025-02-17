@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/features/auth/screens/login_screen.dart';
-import 'package:whatsapppp/features/auth/screens/otp_screen.dart';
+import 'package:whatsapppp/features/auth/screens/sign_up_screen.dart';
 import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
@@ -19,14 +19,20 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         builder: (_) => LoginScreen(),
       );
 
-    // otp screen
-    case OTPScreen.routeName:
-      final verificationId = settings.arguments as String;
+    // sign up screen
+    case SignUpScreen.routeName:
       return MaterialPageRoute(
-        builder: (_) => OTPScreen(
-          verificationId: verificationId,
-        ),
+        builder: (_) => SignUpScreen(),
       );
+
+    // // otp screen
+    // case OTPScreen.routeName:
+    //   final verificationId = settings.arguments as String;
+    //   return MaterialPageRoute(
+    //     builder: (_) => OTPScreen(
+    //       verificationId: verificationId,
+    //     ),
+    //   );
 
     // user information screen
     case UserInformationScreen.routeName:
