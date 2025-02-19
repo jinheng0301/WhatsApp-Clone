@@ -96,6 +96,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
             top: Radius.circular(30),
           ),
           child: CupertinoTabBar(
+            onTap: navigationTapped,
             items: [
               BottomNavigationBarItem(
                 icon: Icon(

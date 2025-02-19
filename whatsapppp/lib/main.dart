@@ -22,9 +22,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Set persistence to LOCAL (this ensures auth state persists across app restarts)
-  await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
-
   runApp(
     const ProviderScope(
       child: MyApp(),
