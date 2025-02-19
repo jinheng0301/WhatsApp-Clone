@@ -19,7 +19,7 @@ final userDataAuthProvider = FutureProvider((ref) {
 });
 
 class AuthController {
-  late final AuthRepository authRepository;
+ final AuthRepository authRepository;
   final Ref ref;
 
   AuthController({
@@ -56,7 +56,7 @@ class AuthController {
     required BuildContext context,
     File? profilePic,
   }) async {
-    await authRepository.signUpWithEmail(
+    return await authRepository.signUpWithEmail(
       email: email,
       password: password,
       name: name,
@@ -71,7 +71,7 @@ class AuthController {
     required String password,
     required BuildContext context,
   }) async {
-    await authRepository.signInWithEmail(
+    return await authRepository.signInWithEmail(
       email: email,
       password: password,
       context: context,

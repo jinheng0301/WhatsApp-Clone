@@ -7,7 +7,7 @@ import 'package:riverpod/riverpod.dart';
 import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/models/user_model.dart';
-import 'package:whatsapppp/screens/mobile_layout_screen.dart';
+import 'package:whatsapppp/screens/mobile_screen_layout.dart';
 
 final authRepositoryProvider = Provider(
   (ref) => AuthRepository(
@@ -17,8 +17,8 @@ final authRepositoryProvider = Provider(
 );
 
 class AuthRepository {
-  late final FirebaseAuth auth;
-  late final FirebaseFirestore firestore;
+  final FirebaseAuth auth;
+  final FirebaseFirestore firestore;
 
   AuthRepository({
     required this.auth,
@@ -26,6 +26,8 @@ class AuthRepository {
   });
 
   Future<UserModel?> getCurrentUserData() async {
+    if (auth.currentUser == null) return null;
+
     var userData =
         await firestore.collection('users').doc(auth.currentUser?.uid).get();
 
@@ -140,7 +142,7 @@ class AuthRepository {
     required BuildContext context,
   }) async {
     try {
-      auth.signInWithEmailAndPassword(email: email, password: password);
+      await auth.signInWithEmailAndPassword(email: email, password: password);
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -160,7 +162,7 @@ class AuthRepository {
   }) async {
     try {
       String uid = auth.currentUser!.uid;
-      String email = auth.currentUser!.phoneNumber!;
+      String email = auth.currentUser!.email ?? '';
       String photoUrl =
           'https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__480.jpg';
 

@@ -104,6 +104,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                   size: 30,
                   color: _page == 0 ? primaryColor : secondaryColor,
                 ),
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(
@@ -111,6 +112,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                   size: 30,
                   color: _page == 1 ? primaryColor : secondaryColor,
                 ),
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(
@@ -118,6 +120,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                   size: 30,
                   color: _page == 2 ? primaryColor : secondaryColor,
                 ),
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(
@@ -125,6 +128,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                   size: 30,
                   color: _page == 3 ? primaryColor : secondaryColor,
                 ),
+                label: '',
               ),
             ],
           ),
