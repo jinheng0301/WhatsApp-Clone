@@ -54,12 +54,14 @@ class AuthController {
     required String password,
     required String name,
     required BuildContext context,
+    required String phoneNumber,
     File? profilePic,
   }) async {
     return await authRepository.signUpWithEmail(
       email: email,
       password: password,
       name: name,
+      phoneNumber: phoneNumber,
       context: context,
       profilePic: profilePic,
       ref: ref,

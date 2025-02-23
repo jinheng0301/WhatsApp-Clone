@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
@@ -19,8 +20,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final nameController = TextEditingController();
+  final phoneController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   File? profilePic;
+  Country? country;
 
   @override
   void dispose() {
@@ -29,6 +32,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     emailController.dispose();
     passwordController.dispose();
     nameController.dispose();
+    phoneController.dispose();
   }
 
   // pick image from gallery
@@ -37,12 +41,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     setState(() {});
   }
 
+  void pickCountry() {
+    showCountryPicker(
+      context: context,
+      onSelect: (Country _country) {
+        setState(() {
+          country = _country;
+        });
+      },
+    );
+  }
+
   void signUp() {
     if (_formKey.currentState!.validate()) {
+      String phoneNumber = '';
+      if (country != null && phoneController.text.trim().isNotEmpty) {
+        phoneNumber = '+${country!.phoneCode}${phoneController.text.trim()}';
+      }
+
       ref.read(authControllerProvider).signUpWithEmail(
             email: emailController.text.trim(),
             password: passwordController.text.trim(),
             name: nameController.text.trim(),
+            phoneNumber: phoneNumber,
             context: context,
             profilePic: profilePic,
           );
@@ -136,6 +157,27 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     }
                     return null;
                   },
+                ),
+                SizedBox(height: 20),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: pickCountry,
+                      child: Text(country != null
+                          ? '+${country!.phoneCode}'
+                          : 'Pick Country'),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: 'Phone Number (Optional)',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 20),
                 CustomButton(

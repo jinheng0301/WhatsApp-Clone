@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
 final selectContactRepositoryProvider = Provider(
@@ -37,6 +38,17 @@ class SelectContactRepository {
       for (var document in userCollection.docs) {
         var userData = UserModel.fromMap(document.data());
         print(selectedContact.phones[0].number);
+        String selectedPhoneNumber =
+            selectedContact.phones[0].number.replaceAll('', '');
+
+        if (selectedPhoneNumber == userData.phoneNumber) {
+          isFound = true;
+          Navigator.pushNamed(context, MobileChatScreen.routeName);
+        }
+      }
+
+      if (!isFound) {
+        showSnackBar(context, 'This number does not exist in your contact');
       }
     } catch (e) {
       showSnackBar(context, e.toString());

@@ -3,6 +3,7 @@ import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/features/auth/screens/sign_up_screen.dart';
 import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
+import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 
@@ -40,9 +41,16 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         builder: (_) => UserInformationScreen(),
       );
 
+    // select contact screen
     case SelectContactScreens.routeName:
       return MaterialPageRoute(
         builder: (_) => SelectContactScreens(),
+      );
+
+    // mobile chat screen
+    case MobileChatScreen.routeName:
+      return MaterialPageRoute(
+        builder: (_) => MobileChatScreen(),
       );
 
     // error screen

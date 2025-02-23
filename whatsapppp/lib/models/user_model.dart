@@ -4,6 +4,7 @@ class UserModel {
   late final String profilePic;
   late final bool isOnline;
   late final String email;
+  late final String phoneNumber;
   late final List<String> groupId;
 
   UserModel({
@@ -12,6 +13,7 @@ class UserModel {
     required this.profilePic,
     required this.isOnline,
     required this.email,
+    required this.phoneNumber,
     required this.groupId,
   });
 
@@ -22,6 +24,7 @@ class UserModel {
       'profilePic': profilePic,
       'isOnline': isOnline,
       'email': email,
+      'phoneNumber': phoneNumber,
       'groupId': groupId,
     };
   }
@@ -33,6 +36,7 @@ class UserModel {
       profilePic: map['profilePic'] ?? '',
       isOnline: map['isOnline'] ?? false,
       email: map['email'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
       groupId: List<String>.from(map['groupId']),
     );
   }

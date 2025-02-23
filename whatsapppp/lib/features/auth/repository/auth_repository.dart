@@ -94,6 +94,7 @@ class AuthRepository {
     required String email,
     required String password,
     required String name,
+    required String phoneNumber,
     required Ref ref,
     File? profilePic,
   }) async {
@@ -113,16 +114,22 @@ class AuthRepository {
             .storeFileToFirebase('profilePic/$uid', profilePic);
       }
 
-      var user = UserModel(
-        name: name,
-        uid: uid,
-        profilePic: photoUrl,
-        isOnline: true,
-        email: email,
-        groupId: [],
-      );
+      // Create data map first
+      Map<String, dynamic> userData = {
+        'name': name,
+        'uid': uid,
+        'profilePic': photoUrl,
+        'isOnline': true,
+        'email': email,
+        'phoneNumber': phoneNumber,
+        'groupId': [], // Initialize as empty array
+      };
 
-      await firestore.collection('users').doc(uid).set(user.toMap());
+      // Save to Firebase using set with merge option
+      await firestore
+          .collection('users')
+          .doc(uid)
+          .set(userData, SetOptions(merge: true));
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -166,23 +173,40 @@ class AuthRepository {
       String photoUrl =
           'https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__480.jpg';
 
-      // overwrite the photoUrl if the user has selected the profile pic
       if (profilePic != null) {
         photoUrl = await ref
             .read(CommonFirebaseStorageRepositoryProvider)
             .storeFileToFirebase('profilePic/$uid', profilePic);
       }
 
-      var user = UserModel(
+      // Create a Map of the data first
+      Map<String, dynamic> userData = {
+        'name': name,
+        'uid': uid,
+        'profilePic': photoUrl,
+        'isOnline': true,
+        'email': email,
+        'phoneNumber': auth.currentUser!.phoneNumber
+            .toString(), // Handle null phone number
+        'groupId': [], // Initialize as empty array
+      };
+
+      // Create user model
+      UserModel(
         name: name,
         uid: uid,
         profilePic: photoUrl,
         isOnline: true,
         email: email,
         groupId: [],
+        phoneNumber: auth.currentUser!.phoneNumber.toString(),
       );
 
-      await firestore.collection('users').doc(uid).set(user.toMap());
+      // Save to Firebase using set with merge option
+      await firestore
+          .collection('users')
+          .doc(uid)
+          .set(userData, SetOptions(merge: true));
 
       Navigator.pushAndRemoveUntil(
         context,
