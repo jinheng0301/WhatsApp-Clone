@@ -49,8 +49,15 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
 
     // mobile chat screen
     case MobileChatScreen.routeName:
+      final arguments = settings.arguments as Map<String, dynamic>;
+      final name = arguments['name'];
+      final uid = arguments['uid'];
       return MaterialPageRoute(
-        builder: (_) => MobileChatScreen(),
+        builder: (_) => MobileChatScreen(
+          name: name,
+          uid: uid,
+          isGroupChat: true,
+        ),
       );
 
     // error screen

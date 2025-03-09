@@ -80,6 +80,10 @@ class AuthController {
     );
   }
 
+  Stream<UserModel> userDataById(String userId) {
+    return authRepository.userData(userId);
+  }
+
   void saveUserDataToFirebase(
     BuildContext context,
     String name,
