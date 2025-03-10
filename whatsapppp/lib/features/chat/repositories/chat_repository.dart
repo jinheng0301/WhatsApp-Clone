@@ -288,7 +288,7 @@ class ChatRepository {
       var messageId = const Uuid().v1();
 
       String imageUrl = await ref
-          .read(commonFirebaseStorageRepositoryProvider)
+          .read(CommonFirebaseStorageRepositoryProvider)
           .storeFileToFirebase(
             'chat/${messageEnum.type}/${senderUserData.uid}/$recieverUserId/$messageId',
             file,

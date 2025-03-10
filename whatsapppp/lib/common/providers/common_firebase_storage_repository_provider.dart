@@ -1,12 +1,24 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:riverpod/riverpod.dart';
 
-class CommonFirebaseStorageRepositoryProvider {
-  CommonFirebaseStorageRepositoryProvider._();
+final CommonFirebaseStorageRepositoryProvider = Provider(
+  (ref) => CommonFirebaseStorageRepository(
+    firebaseStorage: FirebaseStorage.instance,
+  ),
+);
 
-  static final provider = Provider((ref) => CommonFirebaseStorageRepository(ref.read));
+class CommonFirebaseStorageRepository {
+  final FirebaseStorage firebaseStorage;
 
-  static final storeFileToFirebase = Provider.autoDispose<String>((ref) => ref.watch(provider).storeFileToFirebase);
+  CommonFirebaseStorageRepository({
+    required this.firebaseStorage,
+  });
 
-  static final deleteFileFromFirebase = Provider.autoDispose<void>((ref) => ref.watch(provider).deleteFileFromFirebase);
+  Future<String> storeFileToFirebase(String path, File file) async {
+    UploadTask uploadTask = firebaseStorage.ref().child(path).putFile(file);
+    TaskSnapshot snapshot = await uploadTask;
+    String downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
 }
