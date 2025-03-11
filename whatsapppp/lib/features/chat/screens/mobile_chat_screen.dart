@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
+import 'package:whatsapppp/features/chat/widgets/bottom_chat_field.dart';
 import 'package:whatsapppp/features/chat/widgets/chat_list.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
@@ -71,6 +72,10 @@ class MobileChatScreen extends ConsumerWidget {
               receiverUserId: uid,
               isGroupChat: isGroupChat,
             ),
+          ),
+          BottomChatField(
+            isGroupChat: isGroupChat,
+            receiverUserId: uid,
           ),
         ],
       ),

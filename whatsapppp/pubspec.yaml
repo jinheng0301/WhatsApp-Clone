@@ -50,6 +50,11 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_cached_video_player: ^2.0.5
   swipe_to: ^1.0.6
+  flutter_sound: ^9.25.4
+  emoji_picker_flutter: ^4.3.0
+  enough_giphy_flutter: ^0.4.1
+  path_provider: ^2.1.5
+  permission_handler: ^11.4.0
 
 dev_dependencies:
   flutter_test:
