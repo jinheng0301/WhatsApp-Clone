@@ -23,6 +23,7 @@ final chatRepositoryProvider = Provider(
 class ChatRepository {
   final FirebaseFirestore firestore;
   final FirebaseAuth auth;
+
   ChatRepository({
     required this.firestore,
     required this.auth,
@@ -125,7 +126,7 @@ class ChatRepository {
       });
     } else {
       // users -> reciever user id => chats -> current user id -> set data
-      var recieverChatContact = ChatContact(
+      var receiverChatContact = ChatContact(
         name: senderUserData.name,
         profilePic: senderUserData.profilePic,
         contactId: senderUserData.uid,
@@ -138,8 +139,9 @@ class ChatRepository {
           .collection('chats')
           .doc(auth.currentUser!.uid)
           .set(
-            recieverChatContact.toMap(),
+            receiverChatContact.toMap(),
           );
+
       // users -> current user id  => chats -> reciever user id -> set data
       var senderChatContact = ChatContact(
         name: recieverUserData!.name,
@@ -166,6 +168,8 @@ class ChatRepository {
     required DateTime timeSent,
     required String messageId,
     required String username,
+
+    // enum is a data type represents like constant
     required MessageEnum messageType,
     required MessageReply? messageReply,
     required String senderUsername,
@@ -200,7 +204,7 @@ class ChatRepository {
             message.toMap(),
           );
     } else {
-      // users -> sender id -> reciever id -> messages -> message id -> store message
+      // users -> sender id -> receiver id -> messages -> message id -> store message
       await firestore
           .collection('users')
           .doc(auth.currentUser!.uid)
@@ -211,7 +215,7 @@ class ChatRepository {
           .set(
             message.toMap(),
           );
-      // users -> eciever id  -> sender id -> messages -> message id -> store message
+      // users -> receiver id  -> sender id -> messages -> message id -> store message
       await firestore
           .collection('users')
           .doc(recieverUserId)
@@ -234,6 +238,7 @@ class ChatRepository {
     required MessageReply? messageReply,
     required bool isGroupChat,
   }) async {
+    // users -> sender id -> receiver id -> messages -> message id -> store message
     try {
       var timeSent = DateTime.now();
       UserModel? recieverUserData;
@@ -246,6 +251,7 @@ class ChatRepository {
 
       var messageId = const Uuid().v1();
 
+      // private function -> not be used outside of chat repository
       _saveDataToContactsSubcollection(
         senderUser,
         recieverUserData,
@@ -260,6 +266,8 @@ class ChatRepository {
         text: text,
         timeSent: timeSent,
         messageType: MessageEnum.text,
+
+        // to generate a unique message id
         messageId: messageId,
         username: senderUser.name,
         messageReply: messageReply,
@@ -344,7 +352,7 @@ class ChatRepository {
       showSnackBar(context, e.toString());
     }
   }
- 
+
   // SEND GIF MESSAGE
   void sendGIFMessage({
     required BuildContext context,

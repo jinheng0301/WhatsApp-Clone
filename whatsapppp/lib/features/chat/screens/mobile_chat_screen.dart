@@ -35,18 +35,22 @@ class MobileChatScreen extends ConsumerWidget {
                     return Loader();
                   }
 
-                  return Column(
-                    children: [
-                      Text(name),
-                      Text(
-                        snapshot.data!.isOnline ? 'Online' : 'Offline',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.normal,
-                        ),
-                      )
-                    ],
-                  );
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    return Column(
+                      children: [
+                        Text(name),
+                        Text(
+                          snapshot.data!.isOnline ? 'Online' : 'Offline',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        )
+                      ],
+                    );
+                  }
+
+                  return Container();
                 },
               ),
         centerTitle: false,

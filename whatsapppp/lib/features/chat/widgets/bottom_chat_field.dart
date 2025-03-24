@@ -242,6 +242,8 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                 ),
               ),
             ),
+
+            // recording
             Padding(
               padding: const EdgeInsets.only(
                 bottom: 8,
@@ -251,7 +253,8 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
               child: CircleAvatar(
                 backgroundColor: const Color(0xFF128C7E),
                 radius: 25,
-                child: GestureDetector(
+                child: InkWell(
+                  onTap: sendTextMessage,
                   child: Icon(
                     isShowSendButton
                         ? Icons.send
@@ -260,7 +263,6 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                             : Icons.mic,
                     color: Colors.white,
                   ),
-                  onTap: sendTextMessage,
                 ),
               ),
             ),

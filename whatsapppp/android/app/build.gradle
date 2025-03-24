@@ -30,7 +30,7 @@ if (flutterRoot == null) {
 
 android {
     namespace = "com.example.whatsapppp"
-    compileSdk = 34
+    compileSdkVersion flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -45,7 +45,7 @@ android {
     defaultConfig {
         applicationId = "com.example.whatsapppp"
         minSdkVersion 23
-        targetSdkVersion 33
+        targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true

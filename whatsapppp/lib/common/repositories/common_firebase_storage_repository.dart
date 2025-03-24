@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:riverpod/riverpod.dart';
 
+// ignore: non_constant_identifier_names
 final CommonFirebaseStorageRepositoryProvider = Provider(
   (ref) => CommonFirebaseStorageRepository(
     firebaseStorage: FirebaseStorage.instance,
