@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_cached_video_player/cached_video_player.dart';
+import 'package:video_player/video_player.dart';
 
 class VideoPlayerItem extends StatefulWidget {
-  late final String videoUrl;
+  final String videoUrl;
 
-  VideoPlayerItem({
+  const VideoPlayerItem({
     required this.videoUrl,
+    super.key,
   });
 
   @override
@@ -13,54 +14,59 @@ class VideoPlayerItem extends StatefulWidget {
 }
 
 class _VideoPlayerItemState extends State<VideoPlayerItem> {
-  late CachedVideoPlayerController videoPlayerController;
+  late VideoPlayerController videoPlayerController;
   bool isPlay = false;
+  bool isInitialized = false;
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    videoPlayerController = CachedVideoPlayerController.network(widget.videoUrl)
-      ..initialize().then((value) {
-        videoPlayerController.setVolume(1);
+    videoPlayerController = VideoPlayerController.network(widget.videoUrl)
+      ..initialize().then((_) {
+        setState(() {
+          isInitialized = true;
+        });
+        videoPlayerController.setVolume(1.0);
       });
   }
 
   @override
   void dispose() {
-    // TODO: implement dispose
-    super.dispose();
     videoPlayerController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        children: [
-          CachedVideoPlayer(videoPlayerController),
-          Align(
-            alignment: Alignment.center,
-            child: IconButton(
-              onPressed: () {
-                if (isPlay) {
-                  videoPlayerController.pause();
-                } else {
-                  videoPlayerController.play();
-                }
-
-                setState(() {
-                  isPlay = !isPlay;
-                });
-              },
-              icon: Icon(
-                isPlay ? Icons.pause_circle : Icons.play_circle,
-              ),
+    return isInitialized
+        ? AspectRatio(
+            aspectRatio: videoPlayerController.value.aspectRatio,
+            child: Stack(
+              children: [
+                VideoPlayer(videoPlayerController),
+                Align(
+                  alignment: Alignment.center,
+                  child: IconButton(
+                    icon: Icon(
+                      isPlay ? Icons.pause_circle : Icons.play_circle,
+                      size: 48,
+                      color: Colors.white70,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (isPlay) {
+                          videoPlayerController.pause();
+                        } else {
+                          videoPlayerController.play();
+                        }
+                        isPlay = !isPlay;
+                      });
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          )
+        : const Center(child: CircularProgressIndicator());
   }
 }

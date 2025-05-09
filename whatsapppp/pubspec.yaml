@@ -54,7 +54,6 @@ dependencies:
   enough_giphy_flutter: ^0.4.1
   path_provider: ^2.1.5
   permission_handler: ^11.4.0
-  flutter_cached_video_player: ^2.0.5
 
 dev_dependencies:
   flutter_test:
