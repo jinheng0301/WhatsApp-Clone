@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
+import 'package:whatsapppp/features/chat/widgets/contacts_list.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 
 class MobileLayoutScreen extends ConsumerStatefulWidget {
@@ -85,14 +86,19 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
           onPageChanged: onPageChanged,
           physics: AlwaysScrollableScrollPhysics(),
           children: [
-            // ContactsList(),
+            ContactsList(),
             // StatusContactsScreen(),
             // Text('Calls'),
             // ProfileScreen(),
-            Center(child: Text('Chat'),),
-            Center(child: Text('Status'),),
-            Center(child: Text('Calls'),),
-            Center(child: Text('Profile'),),
+            Center(
+              child: Text('Status'),
+            ),
+            Center(
+              child: Text('Calls'),
+            ),
+            Center(
+              child: Text('Profile'),
+            ),
           ],
         ),
         bottomNavigationBar: ClipRRect(
