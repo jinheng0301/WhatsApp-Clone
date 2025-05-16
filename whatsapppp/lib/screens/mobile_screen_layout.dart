@@ -89,6 +89,10 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
             // StatusContactsScreen(),
             // Text('Calls'),
             // ProfileScreen(),
+            Center(child: Text('Chat'),),
+            Center(child: Text('Status'),),
+            Center(child: Text('Calls'),),
+            Center(child: Text('Profile'),),
           ],
         ),
         bottomNavigationBar: ClipRRect(

@@ -1,9 +1,16 @@
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:whatsapppp/features/auth/repository/auth_repository.dart';
 import 'package:whatsapppp/models/user_model.dart';
+
+// Stream provider that listens to Firebase Auth state changes
+final authStateProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authRepositoryProvider).authStateChanges;
+});
 
 final authControllerProvider = Provider((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
@@ -55,6 +62,7 @@ class AuthController {
     required String name,
     required BuildContext context,
     required String phoneNumber,
+    required WidgetRef ref,
     File? profilePic,
   }) async {
     return await authRepository.signUpWithEmail(
@@ -88,6 +96,7 @@ class AuthController {
     BuildContext context,
     String name,
     File? profilePic,
+    WidgetRef ref,
   ) {
     authRepository.saveUserDataToFirebase(
       name: name,

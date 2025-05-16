@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:riverpod/riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
 import 'package:whatsapppp/screens/mobile_screen_layout.dart';
 
@@ -25,6 +26,9 @@ class AuthRepository {
     required this.firestore,
   });
 
+  // Stream for auth state changes
+  Stream<User?> get authStateChanges => auth.authStateChanges();
+
   Future<UserModel?> getCurrentUserData() async {
     if (auth.currentUser == null) return null;
 
@@ -39,66 +43,20 @@ class AuthRepository {
     return user;
   }
 
-  // // verify phone number which will take input from the phone number and then send the OTP to the phone number
-  // // after otp has matches that the user has entered, then the user will be signed in
-  // // just like sign in with email and password
-  // void signInWithPhone(BuildContext context, String phoneNumber) async {
-  //   try {
-  //     await auth.verifyPhoneNumber(
-  //       phoneNumber: phoneNumber,
-  //       verificationCompleted: (PhoneAuthCredential credential) {
-  //         // user input correct phone number
-  //         auth.signInWithCredential(credential);
-  //       },
-  //       verificationFailed: (e) {
-  //         throw Exception(e.message);
-  //       },
-  //       codeSent: (String verificationId, int? resendToken) async {
-  //         // then the OTP will send and the user will be navigated to the OTP screen
-  //         Navigator.pushNamed(
-  //           context,
-  //           OTPScreen.routeName,
-  //           arguments: verificationId,
-  //         );
-  //       },
-  //       codeAutoRetrievalTimeout: (String verificationId) {},
-  //     );
-  //   } on FirebaseAuthException catch (e) {
-  //     showSnackBar(context, e.message!);
-  //   }
-  // }
-
-  // void verifyOTP({
-  //   required BuildContext context,
-  //   required String verificationId,
-  //   required String userOTP,
-  // }) async {
-  //   try {
-  //     PhoneAuthCredential credential = PhoneAuthProvider.credential(
-  //       verificationId: verificationId,
-  //       smsCode: userOTP,
-  //     );
-  //     await auth.signInWithCredential(credential);
-  //     Navigator.pushNamedAndRemoveUntil(
-  //       context,
-  //       UserInformationScreen.routeName,
-  //       (route) => false,
-  //     );
-  //   } catch (e) {
-  //     showSnackBar(context, e.toString());
-  //   }
-  // }
-
   Future<void> signUpWithEmail({
     required BuildContext context,
     required String email,
     required String password,
     required String name,
     required String phoneNumber,
-    required Ref ref,
+    required WidgetRef ref,
     File? profilePic,
   }) async {
     try {
+      // Enable Firebase Auth persistence properly for mobile
+      // This will persist auth state between app restarts
+      await auth.setPersistence(Persistence.LOCAL);
+      
       UserCredential userCredential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -133,11 +91,24 @@ class AuthRepository {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => MobileLayoutScreen()),
+        MaterialPageRoute(builder: (context) => const MobileLayoutScreen()),
         (route) => false,
       );
 
       showSnackBar(context, 'User created successfully');
+    } on FirebaseAuthException catch (e) {
+      // More specific error handling
+      String errorMessage = 'An error occurred during sign up';
+      
+      if (e.code == 'email-already-in-use') {
+        errorMessage = 'This email is already registered';
+      } else if (e.code == 'weak-password') {
+        errorMessage = 'Password is too weak';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Email address is invalid';
+      }
+      
+      showSnackBar(context, errorMessage);
     } catch (e) {
       showSnackBar(context, e.toString());
     }
@@ -149,11 +120,39 @@ class AuthRepository {
     required BuildContext context,
   }) async {
     try {
+      // Enable Firebase Auth persistence properly for mobile
+      // This will persist auth state between app restarts
+      await auth.setPersistence(Persistence.LOCAL);
+      
       await auth.signInWithEmailAndPassword(email: email, password: password);
 
+      // No need to navigate here - the authStateChanges will trigger navigation
+    } on FirebaseAuthException catch (e) {
+      // More specific error handling
+      String errorMessage = 'An error occurred during sign in';
+      
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No user found with this email';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Email address is invalid';
+      } else if (e.code == 'user-disabled') {
+        errorMessage = 'This account has been disabled';
+      }
+      
+      showSnackBar(context, errorMessage);
+    } catch (e) {
+      showSnackBar(context, e.toString());
+    }
+  }
+
+  Future<void> signOut(BuildContext context) async {
+    try {
+      await auth.signOut();
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => MobileLayoutScreen()),
+        MaterialPageRoute(builder: (context) => LoginScreen()),
         (route) => false,
       );
     } catch (e) {
@@ -164,7 +163,7 @@ class AuthRepository {
   void saveUserDataToFirebase({
     required String name,
     required File? profilePic,
-    required Ref ref,
+    required WidgetRef ref,
     required BuildContext context,
   }) async {
     try {
@@ -186,21 +185,9 @@ class AuthRepository {
         'profilePic': photoUrl,
         'isOnline': true,
         'email': email,
-        'phoneNumber': auth.currentUser!.phoneNumber
-            .toString(), // Handle null phone number
+        'phoneNumber': auth.currentUser!.phoneNumber ?? '',
         'groupId': [], // Initialize as empty array
       };
-
-      // Create user model
-      UserModel(
-        name: name,
-        uid: uid,
-        profilePic: photoUrl,
-        isOnline: true,
-        email: email,
-        groupId: [],
-        phoneNumber: auth.currentUser!.phoneNumber.toString(),
-      );
 
       // Save to Firebase using set with merge option
       await firestore
@@ -208,13 +195,7 @@ class AuthRepository {
           .doc(uid)
           .set(userData, SetOptions(merge: true));
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MobileLayoutScreen(),
-        ),
-        (route) => false,
-      );
+      // No need to navigate here - the authStateChanges will trigger navigation
     } catch (e) {
       showSnackBar(context, e.toString());
     }

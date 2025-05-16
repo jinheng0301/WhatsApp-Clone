@@ -38,6 +38,7 @@ class _UserInformationScreenState extends ConsumerState<UserInformationScreen> {
             context,
             name,
             image,
+            ref,
           );
     }
   }

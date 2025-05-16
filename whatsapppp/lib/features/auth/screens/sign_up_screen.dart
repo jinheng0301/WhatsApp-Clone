@@ -66,6 +66,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             phoneNumber: phoneNumber,
             context: context,
             profilePic: profilePic,
+            ref: ref,
           );
     }
   }

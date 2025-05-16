@@ -1,2 +1,0 @@
-C:/Users/User/Desktop/all assignment project/ALL FLUTTER PROJECT/Whatsapp clone/whatsapppp/android/app/.cxx/Debug/6l3v291n/x86/CMakeFiles/edit_cache.dir
-C:/Users/User/Desktop/all assignment project/ALL FLUTTER PROJECT/Whatsapp clone/whatsapppp/android/app/.cxx/Debug/6l3v291n/x86/CMakeFiles/rebuild_cache.dir
