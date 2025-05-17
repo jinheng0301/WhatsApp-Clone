@@ -120,10 +120,10 @@ class ChatRepository {
     bool isGroupChat,
   ) async {
     if (isGroupChat) {
-      await firestore.collection('groups').doc(recieverUserId).update({
-        'lastMessage': text,
-        'timeSent': DateTime.now().millisecondsSinceEpoch,
-      });
+      // await firestore.collection('groups').doc(recieverUserId).update({
+      //   'lastMessage': text,
+      //   'timeSent': DateTime.now().millisecondsSinceEpoch,
+      // });
     } else {
       // users -> reciever user id => chats -> current user id -> set data
       var receiverChatContact = ChatContact(
@@ -195,14 +195,14 @@ class ChatRepository {
     );
     if (isGroupChat) {
       // groups -> group id -> chat -> message
-      await firestore
-          .collection('groups')
-          .doc(recieverUserId)
-          .collection('chats')
-          .doc(messageId)
-          .set(
-            message.toMap(),
-          );
+      // await firestore
+      //     .collection('groups')
+      //     .doc(recieverUserId)
+      //     .collection('chats')
+      //     .doc(messageId)
+      //     .set(
+      //       message.toMap(),
+      //     );
     } else {
       // users -> sender id -> receiver id -> messages -> message id -> store message
       await firestore

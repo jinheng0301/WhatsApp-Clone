@@ -66,7 +66,9 @@ class _ChatListState extends ConsumerState<ChatList> {
 
         return ListView.builder(
           controller: messageController,
-          itemCount: snapshot.data!.length,
+          itemCount: snapshot.hasData && snapshot.data != null
+              ? snapshot.data!.length
+              : 0,
           itemBuilder: (context, index) {
             final messageData = snapshot.data![index];
             var timeSent = DateFormat.Hm().format(messageData.timeSent);

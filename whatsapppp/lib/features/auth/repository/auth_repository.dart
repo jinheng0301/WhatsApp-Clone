@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
@@ -53,10 +54,12 @@ class AuthRepository {
     File? profilePic,
   }) async {
     try {
-      // Enable Firebase Auth persistence properly for mobile
-      // This will persist auth state between app restarts
-      await auth.setPersistence(Persistence.LOCAL);
-      
+      // Only set persistence for web platform
+      if (kIsWeb) {
+        await auth.setPersistence(Persistence.LOCAL);
+      }
+      // On mobile, persistence is enabled by default
+
       UserCredential userCredential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -99,7 +102,7 @@ class AuthRepository {
     } on FirebaseAuthException catch (e) {
       // More specific error handling
       String errorMessage = 'An error occurred during sign up';
-      
+
       if (e.code == 'email-already-in-use') {
         errorMessage = 'This email is already registered';
       } else if (e.code == 'weak-password') {
@@ -107,7 +110,7 @@ class AuthRepository {
       } else if (e.code == 'invalid-email') {
         errorMessage = 'Email address is invalid';
       }
-      
+
       showSnackBar(context, errorMessage);
     } catch (e) {
       showSnackBar(context, e.toString());
@@ -120,17 +123,19 @@ class AuthRepository {
     required BuildContext context,
   }) async {
     try {
-      // Enable Firebase Auth persistence properly for mobile
-      // This will persist auth state between app restarts
-      await auth.setPersistence(Persistence.LOCAL);
-      
+      // Only set persistence for web platform
+      if (kIsWeb) {
+        await auth.setPersistence(Persistence.LOCAL);
+      }
+      // On mobile, persistence is enabled by default
+
       await auth.signInWithEmailAndPassword(email: email, password: password);
 
       // No need to navigate here - the authStateChanges will trigger navigation
     } on FirebaseAuthException catch (e) {
       // More specific error handling
       String errorMessage = 'An error occurred during sign in';
-      
+
       if (e.code == 'user-not-found') {
         errorMessage = 'No user found with this email';
       } else if (e.code == 'wrong-password') {
@@ -140,7 +145,7 @@ class AuthRepository {
       } else if (e.code == 'user-disabled') {
         errorMessage = 'This account has been disabled';
       }
-      
+
       showSnackBar(context, errorMessage);
     } catch (e) {
       showSnackBar(context, e.toString());
