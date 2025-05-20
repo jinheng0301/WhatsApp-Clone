@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
+import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/select_contacts/controllers/select_contact_controller.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
@@ -13,13 +14,43 @@ class SelectContactScreens extends ConsumerStatefulWidget {
       _SelectContactScreensState();
 }
 
-class _SelectContactScreensState extends ConsumerState<SelectContactScreens> {
+class _SelectContactScreensState extends ConsumerState<SelectContactScreens>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  // This method is called when the app state changes (e.g., when the app is resumed or paused)
+  // It updates the user's online status in the app.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        ref.read(authControllerProvider).setUserState(true);
+        break;
+
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+        ref.read(authControllerProvider).setUserState(false);
+        break;
+
+      default:
+        ref.read(authControllerProvider).setUserState(false);
+        break;
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -141,27 +172,57 @@ class _SelectContactScreensState extends ConsumerState<SelectContactScreens> {
                     return Card(
                       margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: user.profilePic.isNotEmpty
-                              ? NetworkImage(user.profilePic)
-                              : null,
-                          backgroundColor: Colors.grey[300],
-                          child: user.profilePic.isEmpty
-                              ? Text(
-                                  user.name[0].toUpperCase(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              backgroundImage: user.profilePic.isNotEmpty
+                                  ? NetworkImage(user.profilePic)
+                                  : null,
+                              backgroundColor: Colors.grey[300],
+                              child: user.profilePic.isEmpty
+                                  ? Text(
+                                      user.name[0].toUpperCase(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            // Online status indicator
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: user.isOnline
+                                      ? Colors.green
+                                      : Colors.grey,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
                                   ),
-                                )
-                              : null,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        title: Text(
-                          user.name,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                user.name,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,22 +231,17 @@ class _SelectContactScreensState extends ConsumerState<SelectContactScreens> {
                               user.phoneNumber,
                               style: TextStyle(color: Colors.grey[600]),
                             ),
-                            if (user.isOnline)
-                              Text(
-                                'Online',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 12,
-                                ),
-                              )
-                            else
-                              Text(
-                                'Offline',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
+                            Text(
+                              user.isOnline ? 'Online' : 'Offline',
+                              style: TextStyle(
+                                color:
+                                    user.isOnline ? Colors.green : Colors.grey,
+                                fontSize: 12,
+                                fontWeight: user.isOnline
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
+                            ),
                           ],
                         ),
                         trailing: Icon(

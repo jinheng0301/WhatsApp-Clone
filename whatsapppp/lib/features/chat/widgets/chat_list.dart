@@ -60,6 +60,7 @@ class _ChatListState extends ConsumerState<ChatList> {
           return Loader();
         }
 
+        // Scroll to the bottom of the chat list when new messages arrive
         SchedulerBinding.instance.addPostFrameCallback((_) {
           messageController.jumpTo(messageController.position.maxScrollExtent);
         });
@@ -82,6 +83,8 @@ class _ChatListState extends ConsumerState<ChatList> {
                     messageData.messageId,
                   );
             }
+
+            // Check if the message is sent by the current user
             if (messageData.senderId ==
                 FirebaseAuth.instance.currentUser!.uid) {
               return MyMessageCard(
@@ -99,6 +102,8 @@ class _ChatListState extends ConsumerState<ChatList> {
                 isSeen: messageData.isSeen,
               );
             }
+
+            // If the message is not sent by the current user, it's from the other user
             return SenderMessageCard(
               message: messageData.text,
               date: timeSent,

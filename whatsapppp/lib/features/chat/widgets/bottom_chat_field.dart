@@ -83,6 +83,8 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     }
   }
 
+  // Function to send file messages
+  // This function manages a file and a message type (image, video, audio) and sends the file
   void sendFileMessage(
     File file,
     MessageEnum messageEnum,
@@ -96,6 +98,8 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
         );
   }
 
+  // Function to select an image from the gallery
+  // This function uses the pickImageFromGallery function to select an image
   void selectImage() async {
     File? image = await pickImageFromGallery(context);
     if (image != null) {

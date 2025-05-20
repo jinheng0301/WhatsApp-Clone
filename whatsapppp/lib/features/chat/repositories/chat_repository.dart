@@ -29,7 +29,8 @@ class ChatRepository {
     required this.auth,
   });
 
-  // SEND TEXT MESSAGE with enhanced debugging and group validation
+  // SEND TEXT MESSAGE 
+  // This method is used to send text messages
   void sendTextMessage({
     required BuildContext context,
     required String text,
@@ -150,6 +151,7 @@ class ChatRepository {
   }
 
   // Enhanced _saveDataToContactsSubcollection with better error handling
+  // This method is used to save the message data to the contacts subcollection
   Future<void> _saveDataToContactsSubcollection(
     UserModel senderUserData,
     UserModel? recieverUserData,
@@ -234,6 +236,7 @@ class ChatRepository {
   }
 
   // Enhanced _saveMessageToMessageSubcollection with better error handling
+  // This method is used to save the message data to the message subcollection
   Future<void> _saveMessageToMessageSubcollection({
     required String recieverUserId,
     required String text,
@@ -447,7 +450,8 @@ class ChatRepository {
     }
   }
 
-  // Rest of the methods remain the same...
+  // SEND FILE MESSAGE
+  // This method is used to send files like images, videos, and audio
   void sendFileMessage({
     required BuildContext context,
     required File file,
@@ -494,6 +498,7 @@ class ChatRepository {
         default:
           contactMsg = 'GIF';
       }
+
       _saveDataToContactsSubcollection(
         senderUserData,
         recieverUserData,

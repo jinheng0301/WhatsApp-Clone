@@ -26,7 +26,7 @@ final userDataAuthProvider = FutureProvider((ref) {
 });
 
 class AuthController {
- final AuthRepository authRepository;
+  final AuthRepository authRepository;
   final Ref ref;
 
   AuthController({
@@ -39,22 +39,6 @@ class AuthController {
     UserModel? user = await authRepository.getCurrentUserData();
     return user;
   }
-
-  // void signInWithPhone(BuildContext context, String phoneNumber) {
-  //   authRepository.signInWithPhone(context, phoneNumber);
-  // }
-
-  // void verifyOTP({
-  //   required BuildContext context,
-  //   required String verificationId,
-  //   required String userOTP,
-  // }) {
-  //   authRepository.verifyOTP(
-  //     context: context,
-  //     verificationId: verificationId,
-  //     userOTP: userOTP,
-  //   );
-  // }
 
   Future<void> signUpWithEmail({
     required String email,
@@ -104,5 +88,9 @@ class AuthController {
       context: context,
       ref: ref,
     );
+  }
+
+  void setUserState(bool isOnline) {
+    authRepository.setUserState(isOnline);
   }
 }

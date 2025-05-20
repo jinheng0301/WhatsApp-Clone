@@ -213,4 +213,14 @@ class AuthRepository {
           ),
         );
   }
+
+  void setUserState(bool isOnline) async {
+    try {
+      await firestore.collection('users').doc(auth.currentUser!.uid).update({
+        'isOnline': isOnline,
+      });
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+  }
 }

@@ -7,30 +7,85 @@ import 'package:whatsapppp/features/chat/widgets/bottom_chat_field.dart';
 import 'package:whatsapppp/features/chat/widgets/chat_list.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
-class MobileChatScreen extends ConsumerWidget {
+class MobileChatScreen extends ConsumerStatefulWidget {
   static const String routeName = '/mobile-chat-screen';
+
   final String name;
   final String uid;
   final bool isGroupChat;
   final String profilePic;
 
-  MobileChatScreen({
+  const MobileChatScreen({
+    Key? key,
     required this.name,
     required this.uid,
-    required this.isGroupChat, // Make sure this is required
-    required this.profilePic, // Add profilePic parameter
-  });
+    required this.isGroupChat,
+    required this.profilePic,
+  }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MobileChatScreen> createState() => _MobileChatScreenState();
+
+  // Factory constructor to handle route arguments
+  static Widget fromRoute(BuildContext context, Object? arguments) {
+    final args = arguments as Map<String, dynamic>;
+    return MobileChatScreen(
+      name: args['name'] as String,
+      uid: args['uid'] as String,
+      isGroupChat: args['isGroupChat'] as bool,
+      profilePic: args['profilePic'] as String,
+    );
+  }
+}
+
+class _MobileChatScreenState extends ConsumerState<MobileChatScreen>
+    with WidgetsBindingObserver {
+  // To know where our app state is
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // TODO: implement didChangeAppLifecycleState
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        ref.read(authControllerProvider).setUserState(true);
+        break;
+
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+        ref.read(authControllerProvider).setUserState(false);
+        break;
+
+      default:
+        ref.read(authControllerProvider).setUserState(false);
+        break;
+    }
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: appBarColor,
-        title: isGroupChat
+        title: widget.isGroupChat
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name),
+                  Text(widget.name),
                   const Text(
                     'Group',
                     style: TextStyle(
@@ -41,23 +96,24 @@ class MobileChatScreen extends ConsumerWidget {
                 ],
               )
             : StreamBuilder<UserModel>(
-                stream: ref.read(authControllerProvider).userDataById(uid),
+                stream:
+                    ref.read(authControllerProvider).userDataById(widget.uid),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Loader();
+                    return const Loader();
                   }
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name),
+                      Text(widget.name),
                       Text(
                         snapshot.data?.isOnline ?? false ? 'Online' : 'Offline',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.normal,
                         ),
-                      )
+                      ),
                     ],
                   );
                 },
@@ -66,15 +122,15 @@ class MobileChatScreen extends ConsumerWidget {
         actions: [
           IconButton(
             onPressed: () {},
-            icon: Icon(Icons.video_call),
+            icon: const Icon(Icons.video_call),
           ),
           IconButton(
             onPressed: () {},
-            icon: Icon(Icons.call),
+            icon: const Icon(Icons.call),
           ),
           IconButton(
             onPressed: () {},
-            icon: Icon(Icons.more_vert),
+            icon: const Icon(Icons.more_vert),
           ),
         ],
       ),
@@ -82,27 +138,16 @@ class MobileChatScreen extends ConsumerWidget {
         children: [
           Expanded(
             child: ChatList(
-              receiverUserId: uid,
-              isGroupChat: isGroupChat,
+              receiverUserId: widget.uid,
+              isGroupChat: widget.isGroupChat,
             ),
           ),
           BottomChatField(
-            receiverUserId: uid,
-            isGroupChat: isGroupChat,
+            receiverUserId: widget.uid,
+            isGroupChat: widget.isGroupChat,
           ),
         ],
       ),
-    );
-  }
-
-  // Factory constructor to handle route arguments
-  static Widget fromRoute(BuildContext context, Object? arguments) {
-    final args = arguments as Map<String, dynamic>;
-    return MobileChatScreen(
-      name: args['name'] as String,
-      uid: args['uid'] as String,
-      isGroupChat: args['isGroupChat'] as bool,
-      profilePic: args['profilePic'] as String,
     );
   }
 }
