@@ -49,17 +49,41 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
 
     // mobile chat screen
     case MobileChatScreen.routeName:
-      final arguments = settings.arguments as Map<String, dynamic>;
-      final name = arguments['name'];
-      final uid = arguments['uid'];
+      // Verify the arguments and create the screen
+      if (settings.arguments is Map<String, dynamic>) {
+        final Map<String, dynamic> args =
+            settings.arguments as Map<String, dynamic>;
+
+        // Log the arguments to debug
+        print('Route arguments: $args');
+
+        // Validate that all required arguments are present
+        final bool isValidArgs = args.containsKey('name') &&
+            args.containsKey('uid') &&
+            args.containsKey('isGroupChat') &&
+            args.containsKey('profilePic');
+
+        if (isValidArgs) {
+          return MaterialPageRoute(
+            builder: (context) => MobileChatScreen(
+              name: args['name'] as String,
+              uid: args['uid'] as String,
+              isGroupChat: args['isGroupChat'] as bool,
+              profilePic: args['profilePic'] as String,
+            ),
+          );
+        }
+      }
+
+      // If arguments are missing or invalid, show an error screen
       return MaterialPageRoute(
-        builder: (_) => MobileChatScreen(
-          name: name,
-          uid: uid,
-          isGroupChat: true,
+        builder: (_) => Scaffold(
+          body: Center(
+            child: Text('Invalid arguments for MobileChatScreen'),
+          ),
         ),
       );
-
+      
     // error screen
     default:
       return MaterialPageRoute(

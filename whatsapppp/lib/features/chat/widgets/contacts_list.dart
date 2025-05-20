@@ -5,153 +5,188 @@ import 'package:whatsapppp/common/utils/color.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/chat/controller/chat_controller.dart';
 import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
-import 'package:whatsapppp/models/chat_contact.dart';
 
 class ContactsList extends ConsumerWidget {
   const ContactsList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-     return Padding(
-      padding: const EdgeInsets.only(top: 10.0),
-      child: SingleChildScrollView(
-        child: Column( 
-          children: [
-            // StreamBuilder<List<ChatContact>>(
-            //     stream: ref.watch(chatControllerProvider).chatContacts(),
-            //     builder: (context, snapshot) {
-            //       if (snapshot.connectionState == ConnectionState.waiting) {
-            //         return const Loader();
-            //       }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ─────────── GROUPS ───────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Groups',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
 
-            //       return ListView.builder(
-            //         shrinkWrap: true,
-            //         itemCount: snapshot.hasData && snapshot.data != null ? snapshot.data!.length : 0,
-            //         itemBuilder: (context, index) {
-            //           var chatContactData = snapshot.data![index];
-
-            //           return Column(
-            //             children: [
-            //               InkWell(
-            //                 onTap: () {
-            //                   Navigator.pushNamed(
-            //                     context,
-            //                     MobileChatScreen.routeName,
-            //                     arguments: {
-            //                       'name': chatContactData.name,
-            //                       'uid': chatContactData.contactId,
-            //                     },
-            //                   );
-            //                 },
-            //                 child: Padding(
-            //                   padding: const EdgeInsets.only(bottom: 8.0),
-            //                   child: ListTile(
-            //                     title: Text(
-            //                       chatContactData.name,
-            //                       style: const TextStyle(
-            //                         fontSize: 18,
-            //                       ),
-            //                     ),
-            //                     subtitle: Padding(
-            //                       padding: const EdgeInsets.only(top: 6.0),
-            //                       child: Text(
-            //                         chatContactData.lastMessage,
-            //                         style: const TextStyle(fontSize: 15),
-            //                       ),
-            //                     ),
-            //                     leading: CircleAvatar(
-            //                       backgroundImage: NetworkImage(
-            //                         groupData.groupPic,
-            //                       ),
-            //                       radius: 30,
-            //                     ),
-            //                     trailing: Text(
-            //                       DateFormat.Hm().format(groupData.timeSent),
-            //                       style: const TextStyle(
-            //                         color: Colors.grey,
-            //                         fontSize: 13,
-            //                       ),
-            //                     ),
-            //                   ),
-            //                 ),
-            //               ),
-            //               const Divider(color: dividerColor, indent: 85),
-            //             ],
-            //           );
-            //         },
-            //       );
-            //     }),
-
-            // to display the list of contacts
-            StreamBuilder<List<ChatContact>>(
-                stream: ref.watch(chatControllerProvider).chatContacts(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Loader();
-                  }
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: snapshot.hasData && snapshot.data != null ? snapshot.data!.length : 0,
-                    itemBuilder: (context, index) {
-                      var chatContactData = snapshot.data![index];
-
-                      return Column(
-                        children: [
-                          InkWell(
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                MobileChatScreen.routeName,
-                                arguments: {
-                                  'name': chatContactData.name,
-                                  'uid': chatContactData.contactId,
-                                  'isGroupChat': false,
-                                  'profilePic': chatContactData.profilePic,
-                                },
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: ListTile(
-                                title: Text(
-                                  chatContactData.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 6.0),
-                                  child: Text(
-                                    chatContactData.lastMessage,
-                                    style: const TextStyle(fontSize: 15),
-                                  ),
-                                ),
-                                leading: CircleAvatar(
-                                  backgroundImage: NetworkImage(
-                                    chatContactData.profilePic,
-                                  ),
-                                  radius: 30,
-                                ),
-                                trailing: Text(
-                                  DateFormat.Hm()
-                                      .format(chatContactData.timeSent),
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const Divider(color: dividerColor, indent: 85),
-                        ],
-                      );
-                    },
+          Consumer(builder: (context, ref, _) {
+            final groupStream = ref.watch(chatControllerProvider).chatGroups();
+            return StreamBuilder(
+              stream: groupStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Loader();
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error loading groups'));
+                } else if (!snapshot.hasData ||
+                    (snapshot.data?.isEmpty ?? true)) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'No groups yet.',
+                      style: TextStyle(
+                        color: Colors.grey,
+                      ),
+                    ),
                   );
-                }),
-          ],
-        ),
+                }
+
+                final groups = snapshot.data!;
+
+                return ListView.separated(
+                  physics: NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
+                  itemCount: groups.length,
+                  separatorBuilder: (_, __) => Divider(
+                    color: dividerColor,
+                    indent: 85,
+                  ),
+                  itemBuilder: (context, i) {
+                    final grp = groups[i];
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: NetworkImage(grp.groupPic),
+                        radius: 24,
+                      ),
+                      title: Text(grp.name),
+                      subtitle: Text(
+                        grp.lastMessage,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        DateFormat.Hm().format(grp.timeSent),
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        MobileChatScreen.routeName,
+                        arguments: {
+                          'name': grp.name,
+                          'uid': grp.groupId,
+                          'isGroupChat': true,
+                          'profilePic': grp.groupPic,
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          }),
+
+          SizedBox(height: 24),
+
+          // ─────────── CONTACTS ───────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Contacts',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          Consumer(builder: (context, ref, _) {
+            final contactStream =
+                ref.watch(chatControllerProvider).chatContacts();
+            return StreamBuilder(
+              stream: contactStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Loader();
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error loading contacts',
+                    ),
+                  );
+                } else if (!snapshot.hasData ||
+                    (snapshot.data?.isEmpty ?? true)) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'No contacts yet.',
+                      style: TextStyle(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  );
+                }
+
+                final contacts = snapshot.data!;
+
+                return ListView.separated(
+                  physics: NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
+                  itemCount: contacts.length,
+                  separatorBuilder: (_, __) => Divider(
+                    color: dividerColor,
+                    indent: 85,
+                  ),
+                  itemBuilder: (context, i) {
+                    final c = contacts[i];
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: NetworkImage(c.profilePic),
+                        radius: 24,
+                      ),
+                      title: Text(c.name),
+                      subtitle: Text(
+                        c.lastMessage,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        DateFormat.Hm().format(c.timeSent),
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        MobileChatScreen.routeName,
+                        arguments: {
+                          'name': c.name,
+                          'uid': c.contactId,
+                          'isGroupChat': false,
+                          'profilePic': c.profilePic,
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          }),
+        ],
       ),
     );
   }

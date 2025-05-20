@@ -1,171 +1,242 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/select_contacts/controllers/select_contact_controller.dart';
+import 'package:whatsapppp/models/user_model.dart';
 
-class SelectContactScreens extends ConsumerWidget {
+class SelectContactScreens extends ConsumerStatefulWidget {
   static const String routeName = '/select-contact';
   const SelectContactScreens({super.key});
 
-  void selectContact(
-    WidgetRef ref,
-    Contact selectedContact,
-    BuildContext context,
-  ) {
-    ref
-        .read(selectContactControllerProvider)
-        .selectContact(selectedContact, context);
+  @override
+  ConsumerState<SelectContactScreens> createState() =>
+      _SelectContactScreensState();
+}
+
+class _SelectContactScreensState extends ConsumerState<SelectContactScreens> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
-  // Helper method to create a test contact for development purposes
-  Contact _createTestContact(String name, String phone) {
-    final contact = Contact();
-    contact.displayName = name;
-    contact.phones = [Phone(phone)];
-    return contact;
+  void selectUser(UserModel selectedUser) {
+    ref.read(selectContactControllerProvider).selectUser(selectedUser, context);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // Use search provider if there's a search query, otherwise use all users
+    final userProvider = _searchQuery.isEmpty
+        ? ref.watch(getRegisteredUsersProvider)
+        : ref.watch(searchUsersProvider(_searchQuery));
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Select Contact'),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: Icon(Icons.search),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(Icons.more_vert),
+            onPressed: () {
+              // Toggle search functionality
+              if (_searchController.text.isNotEmpty) {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                });
+              }
+            },
+            icon: Icon(Icons.clear),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Add a development mode banner and test contacts option
+          // Search Bar
           Container(
-            color: Colors.amber.withOpacity(0.3),
-            padding: EdgeInsets.all(8),
+            padding: EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search users...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+          ),
+
+          // Development Mode Banner
+          Container(
+            color: Colors.blue.withOpacity(0.1),
+            padding: EdgeInsets.all(12),
             child: Row(
               children: [
-                Icon(Icons.developer_mode, color: Colors.amber[800]),
+                Icon(Icons.info_outline, color: Colors.blue[800]),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Development Mode: Use test contacts for emulator testing',
-                    style: TextStyle(color: Colors.amber[800]),
+                    'Showing all registered users in the app',
+                    style: TextStyle(color: Colors.blue[800]),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // This is where you would inject test contacts for development
-                    // For now we'll just show a snackbar
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Test contacts enabled')),
-                    );
-                  },
-                  child: Text('USE TEST CONTACTS'),
                 ),
               ],
             ),
           ),
 
-          // Test contacts section - Visible only in development mode
-          Container(
-            color: Colors.grey.withOpacity(0.1),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Test Contacts',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                // Sample test contacts for emulator testing
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green,
-                    child: Text('T'),
-                  ),
-                  title: Text('Test User 1'),
-                  subtitle: Text('+1234567890'),
-                  onTap: () {
-                    // Create and select a test contact
-                    final testContact =
-                        _createTestContact('Test User 1', '+1234567890');
-                    selectContact(ref, testContact, context);
-                  },
-                ),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue,
-                    child: Text('T'),
-                  ),
-                  title: Text('Test User 2'),
-                  subtitle: Text('+9876543210'),
-                  onTap: () {
-                    // Create and select a test contact
-                    final testContact =
-                        _createTestContact('Test User 2', '+9876543210');
-                    selectContact(ref, testContact, context);
-                  },
-                ),
-                Divider(),
-              ],
-            ),
-          ),
-
-          // Real contacts section
+          // Registered Users List
           Expanded(
-            child: ref.watch(getContactsProvider).when(
-                  data: (contactList) => contactList.isEmpty
-                      ? Center(
-                          child: Text(
-                              'No contacts found. Register some test users first.'),
-                        )
-                      : ListView.builder(
-                          itemCount: contactList.length,
-                          itemBuilder: (context, index) {
-                            final contact = contactList[index];
+            child: userProvider.when(
+              data: (userList) {
+                if (userList.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'No other users registered yet'
+                              : 'No users found matching "$_searchQuery"',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (_searchQuery.isEmpty) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'Register more accounts to test chat functionality',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }
 
-                            return GestureDetector(
-                              onTap: () {
-                                selectContact(ref, contact, context);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: contact.photo == null
-                                      ? CircleAvatar(
-                                          child: Text(
-                                            contact.displayName[0]
-                                                .toUpperCase(),
-                                          ),
-                                        )
-                                      : CircleAvatar(
-                                          backgroundImage:
-                                              MemoryImage(contact.photo!),
-                                          radius: 30,
-                                        ),
-                                  title: Text(
-                                    contact.displayName,
-                                    style: TextStyle(fontSize: 18),
+                return ListView.builder(
+                  itemCount: userList.length,
+                  itemBuilder: (context, index) {
+                    final user = userList[index];
+
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: user.profilePic.isNotEmpty
+                              ? NetworkImage(user.profilePic)
+                              : null,
+                          backgroundColor: Colors.grey[300],
+                          child: user.profilePic.isEmpty
+                              ? Text(
+                                  user.name[0].toUpperCase(),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
                                   ),
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          user.name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.phoneNumber,
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            if (user.isOnline)
+                              Text(
+                                'Online',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                ),
+                              )
+                            else
+                              Text(
+                                'Offline',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
                                 ),
                               ),
-                            );
-                          },
+                          ],
                         ),
-                  error: (error, stackTrace) => ErrorScreen(
-                    error: error.toString(),
+                        trailing: Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.blue,
+                        ),
+                        onTap: () {
+                          selectUser(user);
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+              error: (error, stackTrace) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Error loading users',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        error.toString(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref.invalidate(getRegisteredUsersProvider);
+                        },
+                        child: Text('Retry'),
+                      ),
+                    ],
                   ),
-                  loading: () => Loader(),
-                ),
+                );
+              },
+              loading: () => Loader(),
+            ),
           ),
         ],
       ),

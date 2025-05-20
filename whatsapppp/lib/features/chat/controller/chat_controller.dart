@@ -43,27 +43,69 @@ class ChatController {
     return chatRepository.getGroupChatStream(groupId);
   }
 
-  void sendTextMessage(
+   void sendTextMessage(
     BuildContext context,
     String text,
     String receiverUserId,
     bool isGroupChat,
-  ) {
-    final messageReply = ref.read(messageReplyProvider);
-    ref.read(userDataAuthProvider).whenData(
-          (value) => chatRepository.sendTextMessage(
+  ) async {
+    try {
+      print('ChatController: Starting to send message');
+      print('Text: $text');
+      print('Receiver ID: $receiverUserId');
+      print('Is Group Chat: $isGroupChat');
+
+      final messageReply = ref.read(messageReplyProvider);
+      
+      // Get user data first and handle it properly
+      final userDataAsync = ref.read(userDataAuthProvider);
+      
+      userDataAsync.when(
+        data: (userData) {
+          if (userData == null) {
+            print('ChatController: User data is null');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('User not authenticated')),
+            );
+            return;
+          }
+          
+          print('ChatController: User data found: ${userData.name}');
+          print('ChatController: Calling repository sendTextMessage');
+          
+          chatRepository.sendTextMessage(
             context: context,
             text: text,
             recieverUserId: receiverUserId,
-            senderUser: value!,
+            senderUser: userData,
             messageReply: messageReply,
             isGroupChat: isGroupChat,
-          ),
-        );
-    ref.read(messageReplyProvider.notifier).update(
-          (state) => null,
-        );
+          );
+        },
+        loading: () {
+          print('ChatController: User data is loading');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Loading user data...')),
+          );
+        },
+        error: (error, stack) {
+          print('ChatController: Error getting user data: $error');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${error.toString()}')),
+          );
+        },
+      );
+
+      // Clear the message reply
+      ref.read(messageReplyProvider.notifier).update((state) => null);
+    } catch (e) {
+      print('ChatController: Exception in sendTextMessage: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send message: ${e.toString()}')),
+      );
+    }
   }
+
 
   void sendFileMessage(
     BuildContext context,

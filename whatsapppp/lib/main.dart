@@ -50,6 +50,10 @@ class MyApp extends ConsumerWidget {
                       if (userData == null) {
                         return LoginScreen();
                       }
+                      
+                      print(
+                          '🔑 CurrentUser UID = ${FirebaseAuth.instance.currentUser?.uid}');
+
                       return const MobileLayoutScreen();
                     },
                     loading: () => const Loader(),

@@ -12,14 +12,14 @@ class MobileChatScreen extends ConsumerWidget {
   final String name;
   final String uid;
   final bool isGroupChat;
+  final String profilePic;
 
   MobileChatScreen({
     required this.name,
     required this.uid,
-    required this.isGroupChat,
+    required this.isGroupChat, // Make sure this is required
+    required this.profilePic, // Add profilePic parameter
   });
-
-  void makeCall(WidgetRef ref, BuildContext context) {}
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,7 +27,19 @@ class MobileChatScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: appBarColor,
         title: isGroupChat
-            ? Text(name)
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name),
+                  const Text(
+                    'Group',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              )
             : StreamBuilder<UserModel>(
                 stream: ref.read(authControllerProvider).userDataById(uid),
                 builder: (context, snapshot) {
@@ -35,22 +47,19 @@ class MobileChatScreen extends ConsumerWidget {
                     return Loader();
                   }
 
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    return Column(
-                      children: [
-                        Text(name),
-                        Text(
-                          snapshot.data!.isOnline ? 'Online' : 'Offline',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.normal,
-                          ),
-                        )
-                      ],
-                    );
-                  }
-
-                  return Container();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name),
+                      Text(
+                        snapshot.data?.isOnline ?? false ? 'Online' : 'Offline',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      )
+                    ],
+                  );
                 },
               ),
         centerTitle: false,
@@ -78,11 +87,22 @@ class MobileChatScreen extends ConsumerWidget {
             ),
           ),
           BottomChatField(
-            isGroupChat: isGroupChat,
             receiverUserId: uid,
+            isGroupChat: isGroupChat,
           ),
         ],
       ),
+    );
+  }
+
+  // Factory constructor to handle route arguments
+  static Widget fromRoute(BuildContext context, Object? arguments) {
+    final args = arguments as Map<String, dynamic>;
+    return MobileChatScreen(
+      name: args['name'] as String,
+      uid: args['uid'] as String,
+      isGroupChat: args['isGroupChat'] as bool,
+      profilePic: args['profilePic'] as String,
     );
   }
 }
