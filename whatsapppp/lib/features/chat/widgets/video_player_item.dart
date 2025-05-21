@@ -1,12 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoPlayerItem extends StatefulWidget {
   final String videoUrl;
+  final Uint8List? blobData;
 
-  const VideoPlayerItem({
+  VideoPlayerItem({
     required this.videoUrl,
-    super.key,
+    this.blobData,
   });
 
   @override
@@ -21,13 +24,34 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   @override
   void initState() {
     super.initState();
-    videoPlayerController = VideoPlayerController.network(widget.videoUrl)
-      ..initialize().then((_) {
-        setState(() {
-          isInitialized = true;
-        });
-        videoPlayerController.setVolume(1.0);
+    _initializeVideo();
+  }
+
+  void _initializeVideo() async {
+    if (widget.videoUrl.startsWith('memory://') && widget.blobData != null) {
+      // Use memory data source
+      videoPlayerController = VideoPlayerController.networkUrl(
+        Uri.parse('data:video/mp4;base64,${_bytesToBase64(widget.blobData!)}'),
+      );
+    } else {
+      // Use regular URL
+      videoPlayerController = VideoPlayerController.networkUrl(
+        Uri.parse(widget.videoUrl),
+      );
+    }
+
+    await videoPlayerController.initialize();
+
+    if (mounted) {
+      setState(() {
+        isInitialized = true;
       });
+      videoPlayerController.setVolume(1.0);
+    }
+  }
+
+  String _bytesToBase64(Uint8List bytes) {
+    return Uri.encodeFull(String.fromCharCodes(bytes));
   }
 
   @override

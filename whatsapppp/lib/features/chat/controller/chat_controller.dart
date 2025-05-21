@@ -43,7 +43,7 @@ class ChatController {
     return chatRepository.getGroupChatStream(groupId);
   }
 
-   void sendTextMessage(
+  void sendTextMessage(
     BuildContext context,
     String text,
     String receiverUserId,
@@ -56,10 +56,10 @@ class ChatController {
       print('Is Group Chat: $isGroupChat');
 
       final messageReply = ref.read(messageReplyProvider);
-      
+
       // Get user data first and handle it properly
       final userDataAsync = ref.read(userDataAuthProvider);
-      
+
       userDataAsync.when(
         data: (userData) {
           if (userData == null) {
@@ -69,10 +69,10 @@ class ChatController {
             );
             return;
           }
-          
+
           print('ChatController: User data found: ${userData.name}');
           print('ChatController: Calling repository sendTextMessage');
-          
+
           chatRepository.sendTextMessage(
             context: context,
             text: text,
@@ -105,7 +105,6 @@ class ChatController {
       );
     }
   }
-
 
   void sendFileMessage(
     BuildContext context,

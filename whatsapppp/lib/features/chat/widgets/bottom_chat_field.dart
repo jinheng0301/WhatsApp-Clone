@@ -143,9 +143,13 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
 
   void toggleEmojiKeyboardContainer() {
     if (isShowEmojiContainer) {
+      // If the emoji container is already shown, hide it and show the keyboard
+      // This is to prevent the keyboard from showing when the emoji container is already open
       showKeyboard();
       hideEmojiContainer();
     } else {
+      // If the emoji container is not shown, hide the keyboard and show the emoji container
+      // This is to prevent the keyboard from showing when the emoji container is already open
       hideKeyboard();
       showEmojiContainer();
     }
@@ -278,6 +282,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                 child: EmojiPicker(
                   onEmojiSelected: (category, emoji) {
                     setState(() {
+                      // Add the selected emoji to the message
                       messageController.text =
                           messageController.text + emoji.emoji;
                     });

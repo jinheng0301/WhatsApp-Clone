@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:whatsapppp/common/enums/message_enums.dart';
 import 'package:whatsapppp/common/providers/message_reply_provider.dart';
+import 'package:whatsapppp/common/repositories/common_blob_storage_repository.dart';
 import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/models/chat_contact.dart';
@@ -29,7 +30,7 @@ class ChatRepository {
     required this.auth,
   });
 
-  // SEND TEXT MESSAGE 
+  // SEND TEXT MESSAGE
   // This method is used to send text messages
   void sendTextMessage({
     required BuildContext context,
@@ -463,25 +464,55 @@ class ChatRepository {
     required bool isGroupChat,
   }) async {
     try {
+      print('ChatRepository: Starting sendFileMessage');
+      print('Sender: ${senderUserData.name} (${senderUserData.uid})');
+      print('Receiver ID: $recieverUserId');
+      print('Message Type: ${messageEnum.name}');
+      print('Is Group Chat: $isGroupChat');
+
       var timeSent = DateTime.now();
       var messageId = const Uuid().v1();
 
-      String imageUrl = await ref
-          .read(CommonFirebaseStorageRepositoryProvider)
-          .storeFileToFirebase(
-            'chat/${messageEnum.type}/${senderUserData.uid}/$recieverUserId/$messageId',
-            file,
-          );
+      String fileId = '';
+      try {
+        // Store the file as blob
+        fileId =
+            await ref.read(commonBlobStorageRepositoryProvider).storeFileAsBlob(
+                  'chat/${messageEnum.type}/${senderUserData.uid}/$recieverUserId/$messageId',
+                  file,
+                  context,
+                );
+        print('ChatRepository: File stored with ID: $fileId');
+      } catch (e) {
+        print('ChatRepository: Error storing file: $e');
+        showSnackBar(context, 'Error uploading file: ${e.toString()}');
+        return;
+      }
 
       UserModel? recieverUserData;
       if (!isGroupChat) {
-        var userDataMap =
-            await firestore.collection('users').doc(recieverUserId).get();
-        recieverUserData = UserModel.fromMap(userDataMap.data()!);
+        try {
+          var userDataMap =
+              await firestore.collection('users').doc(recieverUserId).get();
+
+          if (!userDataMap.exists || userDataMap.data() == null) {
+            print('ChatRepository: Receiver user data not found');
+            showSnackBar(context, 'Receiver user not found');
+            return;
+          }
+
+          recieverUserData = UserModel.fromMap(userDataMap.data()!);
+          print(
+              'ChatRepository: Receiver data loaded: ${recieverUserData.name}');
+        } catch (e) {
+          print('ChatRepository: Error fetching receiver data: $e');
+          showSnackBar(
+              context, 'Error fetching receiver data: ${e.toString()}');
+          return;
+        }
       }
 
       String contactMsg;
-
       switch (messageEnum) {
         case MessageEnum.image:
           contactMsg = '📷 Photo';
@@ -496,32 +527,49 @@ class ChatRepository {
           contactMsg = 'GIF';
           break;
         default:
-          contactMsg = 'GIF';
+          contactMsg = 'File';
       }
 
-      _saveDataToContactsSubcollection(
-        senderUserData,
-        recieverUserData,
-        contactMsg,
-        timeSent,
-        recieverUserId,
-        isGroupChat,
-      );
+      try {
+        print('ChatRepository: Updating contacts subcollection');
+        await _saveDataToContactsSubcollection(
+          senderUserData,
+          recieverUserData,
+          contactMsg,
+          timeSent,
+          recieverUserId,
+          isGroupChat,
+        );
+      } catch (e) {
+        print('ChatRepository: Error updating contacts: $e');
+        showSnackBar(context, 'Error updating contacts: ${e.toString()}');
+        return;
+      }
 
-      _saveMessageToMessageSubcollection(
-        recieverUserId: recieverUserId,
-        text: imageUrl,
-        timeSent: timeSent,
-        messageId: messageId,
-        username: senderUserData.name,
-        messageType: messageEnum,
-        messageReply: messageReply,
-        recieverUserName: recieverUserData?.name,
-        senderUsername: senderUserData.name,
-        isGroupChat: isGroupChat,
-      );
+      try {
+        print('ChatRepository: Saving message');
+        await _saveMessageToMessageSubcollection(
+          recieverUserId: recieverUserId,
+          text: fileId, // Store the file ID
+          timeSent: timeSent,
+          messageId: messageId,
+          username: senderUserData.name,
+          messageType: messageEnum,
+          messageReply: messageReply,
+          recieverUserName: recieverUserData?.name,
+          senderUsername: senderUserData.name,
+          isGroupChat: isGroupChat,
+        );
+      } catch (e) {
+        print('ChatRepository: Error saving message: $e');
+        showSnackBar(context, 'Error saving message: ${e.toString()}');
+        return;
+      }
+
+      print('ChatRepository: File message sent successfully');
     } catch (e) {
-      showSnackBar(context, e.toString());
+      print('ChatRepository: Error in sendFileMessage: $e');
+      showSnackBar(context, 'Failed to send file: ${e.toString()}');
     }
   }
 
@@ -545,6 +593,15 @@ class ChatRepository {
 
       var messageId = const Uuid().v1();
 
+      // For GIFs from URLs, we need to download and store them as blobs
+      // This is a bit simplified for example purposes
+      // In a real app, you might want to use a package like http to download the GIF
+
+      // Here we'll just store the GIF URL directly for simplicity
+      // In a real implementation, you would:
+      // 1. Download the GIF using http package
+      // 2. Store it as a blob using CommonBlobStorageRepository
+
       _saveDataToContactsSubcollection(
         senderUser,
         recieverUserData,
@@ -556,7 +613,7 @@ class ChatRepository {
 
       _saveMessageToMessageSubcollection(
         recieverUserId: recieverUserId,
-        text: gifUrl,
+        text: gifUrl, // In a real implementation, this would be the blob ID
         timeSent: timeSent,
         messageType: MessageEnum.gif,
         messageId: messageId,
