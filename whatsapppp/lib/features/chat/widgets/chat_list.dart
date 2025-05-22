@@ -25,10 +25,11 @@ class ChatList extends ConsumerStatefulWidget {
 
 class _ChatListState extends ConsumerState<ChatList> {
   final ScrollController messageController = ScrollController();
+  bool _isInitialLoad = true;
+  int _previousMessageCount = 0;
 
   @override
   void dispose() {
-    // TODO: implement dispose
     super.dispose();
     messageController.dispose();
   }
@@ -47,6 +48,23 @@ class _ChatListState extends ConsumerState<ChatList> {
         );
   }
 
+  void _scrollToBottom() {
+    if (messageController.hasClients) {
+      // Use animateTo instead of jumpTo for smoother scrolling
+      messageController.animateTo(
+        messageController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _scrollToBottomInstantly() {
+    if (messageController.hasClients) {
+      messageController.jumpTo(messageController.position.maxScrollExtent);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
@@ -57,23 +75,47 @@ class _ChatListState extends ConsumerState<ChatList> {
           : ref.read(chatControllerProvider).chatStream(widget.receiverUserId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Loader();
+          return const Loader();
         }
 
-        // Scroll to the bottom of the chat list when new messages arrive
+        if (!snapshot.hasData ||
+            snapshot.data == null ||
+            snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text('No messages yet. Start the conversation!'),
+          );
+        }
+
+        final messages = snapshot.data!;
+        final currentMessageCount = messages.length;
+
+        // Handle scrolling after the widget is built
         SchedulerBinding.instance.addPostFrameCallback((_) {
-          messageController.jumpTo(messageController.position.maxScrollExtent);
+          if (_isInitialLoad) {
+            // First time loading - scroll to bottom instantly
+            _scrollToBottomInstantly();
+            _isInitialLoad = false;
+            _previousMessageCount = currentMessageCount;
+          } else if (currentMessageCount > _previousMessageCount) {
+            // New messages arrived - scroll to bottom with animation
+            _scrollToBottom();
+            _previousMessageCount = currentMessageCount;
+          }
         });
 
         return ListView.builder(
           controller: messageController,
-          itemCount: snapshot.hasData && snapshot.data != null
-              ? snapshot.data!.length
-              : 0,
+          itemCount: messages.length,
+          // Add some padding at the bottom
+          padding: const EdgeInsets.only(bottom: 20),
           itemBuilder: (context, index) {
-            final messageData = snapshot.data![index];
+            final messageData = messages[index];
             var timeSent = DateFormat.Hm().format(messageData.timeSent);
 
+            // Check if the message is sent by the current user
+            // and if it hasn't been seen yet
+            // If the message is not seen and the receiver is the current user,
+            // mark it as seen
             if (!messageData.isSeen &&
                 messageData.recieverid ==
                     FirebaseAuth.instance.currentUser!.uid) {

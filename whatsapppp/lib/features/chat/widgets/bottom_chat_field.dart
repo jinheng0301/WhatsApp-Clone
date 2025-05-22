@@ -70,6 +70,9 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
       }
       if (isRecording) {
         await soundRecorder!.stopRecorder();
+        // Send the recorded audio file
+        // You can use the path to send the audio file
+        // For example, you can use the sendFileMessage function to send the audio file
         sendFileMessage(File(path), MessageEnum.audio);
       } else {
         await soundRecorder!.startRecorder(
