@@ -40,15 +40,98 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     // TODO: implement initState
     super.initState();
     soundRecorder = FlutterSoundRecorder();
+    _initializeAudio();
+  }
+
+  // Initialize audio recording
+  void _initializeAudio() async {
+    try {
+      openAudio();
+      print('Audio recorder initialized successfully');
+    } catch (e) {
+      print('Error initializing audio recorder: $e');
+    }
   }
 
   void openAudio() async {
-    final status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      throw RecordingPermissionException('Mic permission not allowed!');
+    try {
+      // Check if the microphone permission is granted
+      final status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        print('Mic permission not allowed!');
+        if (mounted) {
+          showSnackBar(
+              context, 'Microphone permission is required for voice messages');
+        }
+        return;
+      }
+      await soundRecorder!.openRecorder();
+      setState(() {
+        isRecorderInit = true;
+      });
+    } catch (e) {
+      print('Error opening audio recorder: $e');
+      if (mounted) {
+        showSnackBar(context, 'Error opening audio recorder: $e');
+      }
     }
-    await soundRecorder!.openRecorder();
-    isRecorderInit = true;
+  }
+
+  Future<void> _handleAudioRecording() async {
+    try {
+      if (!isRecorderInit) {
+        print('Recorder not initialized, attempting to initialize...');
+        _initializeAudio();
+        if (!isRecorderInit) {
+          showSnackBar(context, 'Voice recording not available');
+          return;
+        }
+      }
+
+      if (isRecording) {
+        // Stop recording
+        print('Stopping audio recording...');
+        String? path = await soundRecorder!.stopRecorder();
+
+        if (path != null && File(path).existsSync()) {
+          print('Audio recorded successfully at: $path');
+          // Send the recorded audio file
+          sendFileMessage(File(path), MessageEnum.audio);
+          showSnackBar(context, 'Voice message sent!');
+        } else {
+          print('Recording failed - no file created');
+          showSnackBar(context, 'Recording failed');
+        }
+
+        setState(() {
+          isRecording = false;
+        });
+      } else {
+        // Start recording
+        print('Starting audio recording...');
+        var tempDir = await getTemporaryDirectory();
+        var path =
+            '${tempDir.path}/flutter_sound_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+        await soundRecorder!.startRecorder(
+          toFile: path,
+          codec: Codec.aacADTS, // Specify codec for better compatibility
+        );
+
+        setState(() {
+          isRecording = true;
+        });
+
+        print('Recording started, saving to: $path');
+        showSnackBar(context, 'Recording voice message...');
+      }
+    } catch (e) {
+      print('Error in audio recording: $e');
+      setState(() {
+        isRecording = false;
+      });
+      showSnackBar(context, 'Recording error: $e');
+    }
   }
 
   void sendTextMessage() async {
@@ -63,26 +146,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
         messageController.text = '';
       });
     } else {
-      var tempDir = await getTemporaryDirectory();
-      var path = '${tempDir.path}/flutter_sound.aac';
-      if (!isRecorderInit) {
-        return;
-      }
-      if (isRecording) {
-        await soundRecorder!.stopRecorder();
-        // Send the recorded audio file
-        // You can use the path to send the audio file
-        // For example, you can use the sendFileMessage function to send the audio file
-        sendFileMessage(File(path), MessageEnum.audio);
-      } else {
-        await soundRecorder!.startRecorder(
-          toFile: path,
-        );
-      }
-
-      setState(() {
-        isRecording = !isRecording;
-      });
+      await _handleAudioRecording();
     }
   }
 
@@ -163,8 +227,11 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     // TODO: implement dispose
     super.dispose();
     messageController.dispose();
-    soundRecorder!.closeRecorder();
-    isRecorderInit = false;
+    // Properly close the recorder
+    if (isRecorderInit && soundRecorder != null) {
+      soundRecorder!.closeRecorder();
+    }
+    focusNode.dispose();
   }
 
   @override
@@ -262,7 +329,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                 left: 2,
               ),
               child: CircleAvatar(
-                backgroundColor: const Color(0xFF128C7E),
+                backgroundColor: isRecording ? Colors.red : Color(0xFF128C7E),
                 radius: 25,
                 child: InkWell(
                   onTap: sendTextMessage,

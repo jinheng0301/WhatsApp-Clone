@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
+import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/features/chat/widgets/contacts_list.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
+import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
+import 'package:whatsapppp/features/status/screens/status_contacts_screen.dart';
 
 class MobileLayoutScreen extends ConsumerStatefulWidget {
   const MobileLayoutScreen({super.key});
@@ -85,12 +90,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         physics: AlwaysScrollableScrollPhysics(),
         children: [
           ContactsList(),
-          // StatusContactsScreen(),
-          // Text('Calls'),
-          // ProfileScreen(),
-          Center(
-            child: Text('Status'),
-          ),
+          StatusContactsScreen(),
           Center(
             child: Text('Calls'),
           ),
@@ -141,17 +141,35 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, SelectContactScreens.routeName);
-        },
-        backgroundColor: tabColor,
-        child: Icon(
-          Icons.comment,
-          size: 30,
-          color: Colors.white,
-        ),
-      ),
+      floatingActionButton: () {
+        switch (_page) {
+          case 0:
+            return FloatingActionButton(
+              onPressed: () {
+                Navigator.pushNamed(context, SelectContactScreens.routeName);
+              },
+              backgroundColor: tabColor,
+              child: Icon(Icons.comment, size: 30, color: Colors.white),
+            );
+          case 1:
+            return FloatingActionButton(
+              onPressed: () async {
+                File? pickedImage = await pickImageFromGallery(context);
+                if (pickedImage != null) {
+                  Navigator.pushNamed(
+                    context,
+                    ConfirmStatusScreen.routeName,
+                    arguments: pickedImage,
+                  );
+                }
+              },
+              backgroundColor: tabColor,
+              child: Icon(Icons.camera_alt, size: 30, color: Colors.white),
+            );
+          default:
+            return null;
+        }
+      }(),
     );
   }
 }
