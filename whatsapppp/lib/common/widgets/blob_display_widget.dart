@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
@@ -136,6 +137,60 @@ final mediaBlobProvider =
     );
   } catch (e) {
     print('MediaBlobProvider: General error: $e');
+    return null;
+  }
+});
+
+// Provider specifically for status blob data
+final statusBlobProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, blobId) async {
+  try {
+    print('StatusBlobProvider: Loading blobId: $blobId');
+
+    final userDataAsync = ref.read(userDataAuthProvider);
+
+    return userDataAsync.when(
+      data: (userData) async {
+        if (userData == null) {
+          print('StatusBlobProvider: No user data available');
+          return null;
+        }
+
+        print('StatusBlobProvider: User ID: ${userData.uid}');
+
+        try {
+          // Get blob data from status media collection
+          final blobDoc = await FirebaseFirestore.instance
+              .collection('status')
+              .doc('media')
+              .collection('blobs')
+              .doc(blobId)
+              .get();
+
+          if (blobDoc.exists) {
+            final data = blobDoc.data();
+            print('StatusBlobProvider: Found blob data: ${data?.keys}');
+            return data;
+          }
+
+          print('StatusBlobProvider: Blob not found');
+          return null;
+        } catch (firestoreError) {
+          print('StatusBlobProvider: Firestore error: $firestoreError');
+          return null;
+        }
+      },
+      loading: () {
+        print('StatusBlobProvider: User data loading');
+        return null;
+      },
+      error: (error, stackTrace) {
+        print('StatusBlobProvider: User data error: $error');
+        return null;
+      },
+    );
+  } catch (e) {
+    print('StatusBlobProvider: General error: $e');
     return null;
   }
 });

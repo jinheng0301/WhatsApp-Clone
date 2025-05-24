@@ -17,40 +17,31 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         builder: (_) => LandingScreen(),
       );
 
-    // login screen
+    // LOGIN SCREEN
     case LoginScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => LoginScreen(),
       );
 
-    // sign up screen
+    // SIGN UP SCREEN
     case SignUpScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => SignUpScreen(),
       );
 
-    // // otp screen
-    // case OTPScreen.routeName:
-    //   final verificationId = settings.arguments as String;
-    //   return MaterialPageRoute(
-    //     builder: (_) => OTPScreen(
-    //       verificationId: verificationId,
-    //     ),
-    //   );
-
-    // user information screen
+    // USER INFORMATION SCREEN
     case UserInformationScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => UserInformationScreen(),
       );
 
-    // select contact screen
+    // SELECT CONTACT SCREEN
     case SelectContactScreens.routeName:
       return MaterialPageRoute(
         builder: (_) => SelectContactScreens(),
       );
 
-    // mobile chat screen
+    // MOBILE CHAT SCREEN
     case MobileChatScreen.routeName:
       // Verify the arguments and create the screen
       if (settings.arguments is Map<String, dynamic>) {
@@ -87,14 +78,14 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         ),
       );
 
-    // confirm status screen
+    // CONFIRM STATUS SCREEN
     case ConfirmStatusScreen.routeName:
       final file = settings.arguments as File;
       return MaterialPageRoute(
         builder: (_) => ConfirmStatusScreen(file: file),
       );
 
-    // error screen
+    // ERROR SCREEN
     default:
       return MaterialPageRoute(
         builder: (_) => Scaffold(
