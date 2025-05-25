@@ -9,6 +9,8 @@ import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
+import 'package:whatsapppp/features/status/screens/status_screen.dart';
+import 'package:whatsapppp/models/status_model.dart';
 
 Route<dynamic> onGenerateRoute(RouteSettings settings) {
   switch (settings.name) {
@@ -83,6 +85,13 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
       final file = settings.arguments as File;
       return MaterialPageRoute(
         builder: (_) => ConfirmStatusScreen(file: file),
+      );
+
+    // STATUS SCREEN
+    case StatusScreen.routeName:
+      final status = settings.arguments as Status;
+      return MaterialPageRoute(
+        builder: (_) => StatusScreen(status: status),
       );
 
     // ERROR SCREEN

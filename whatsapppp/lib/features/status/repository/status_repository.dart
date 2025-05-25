@@ -4,11 +4,9 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:whatsapppp/models/status_model.dart';
-import 'package:whatsapppp/models/user_model.dart';
 
 final statusRepositoryProvider = Provider(
   (ref) => StatusRepository(
@@ -86,42 +84,55 @@ class StatusRepository {
 
       print('StatusRepository: Blob saved with ID: $blobId');
 
-      // Get contacts for visibility
-      List<Contact> contacts = [];
-      if (await FlutterContacts.requestPermission()) {
-        contacts = await FlutterContacts.getContacts(withProperties: true);
-      }
-
+      // For email/password auth, we'll make status visible to all registered users
+      // or you can implement a friend system later
       List<String> uidWhoCanSee = [];
-      for (int i = 0; i < contacts.length; i++) {
-        if (contacts[i].phones.isNotEmpty) {
-          var userDataFirebase = await firestore
-              .collection('users')
-              .where(
-                'phoneNumber',
-                isEqualTo: contacts[i].phones[0].number.replaceAll(' ', ''),
-              )
-              .get();
 
-          if (userDataFirebase.docs.isNotEmpty) {
-            var userData = UserModel.fromMap(userDataFirebase.docs[0].data());
-            uidWhoCanSee.add(userData.uid);
-          }
+      // Option 1: Make visible to all users (public statuses)
+      var allUsers = await firestore.collection('users').get();
+      for (var doc in allUsers.docs) {
+        if (doc.id != uid) {
+          // Don't include current user
+          uidWhoCanSee.add(doc.id);
         }
       }
 
+      // Option 2: If you want to use phone contacts (uncomment this and comment above)
+      /*
+      List<Contact> contacts = [];
+      if (await FlutterContacts.requestPermission()) {
+        contacts = await FlutterContacts.getContacts(withProperties: true);
+        
+        for (var contact in contacts) {
+          if (contact.phones.isNotEmpty) {
+            String contactPhone = contact.phones[0].number.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+            
+            // Try to find user by phone number
+            var userQuery = await firestore
+                .collection('users')
+                .where('phoneNumber', isEqualTo: contactPhone)
+                .get();
+                
+            for (var doc in userQuery.docs) {
+              if (doc.id != uid) {
+                uidWhoCanSee.add(doc.id);
+              }
+            }
+          }
+        }
+      }
+      */
+
       print(
-          'StatusRepository: Found ${uidWhoCanSee.length} contacts who can see status');
+          'StatusRepository: Found ${uidWhoCanSee.length} users who can see status');
 
       // Check for existing statuses within 24 hours
       List<String> statusBlobIds = [];
       var statusesSnapshot = await firestore
           .collection('status')
           .where('uid', isEqualTo: uid)
-          .where(
-            'createdAt',
-            isGreaterThan: DateTime.now().subtract(Duration(hours: 24)),
-          )
+          .where('createdAt',
+              isGreaterThan: DateTime.now().subtract(Duration(hours: 24)))
           .get();
 
       if (statusesSnapshot.docs.isNotEmpty) {
@@ -186,7 +197,6 @@ class StatusRepository {
     required File statusImage,
     required BuildContext context,
   }) async {
-    // Call the new blob method
     uploadStatusWithBlob(
       username: username,
       profilePic: profilePic,
@@ -216,23 +226,179 @@ class StatusRepository {
     }
   }
 
-  // Method to get all statuses (for status screen)
-  Stream<List<Status>> getStatus() {
-    return firestore
-        .collection('status')
-        .where(
-          'createdAt',
-          isGreaterThan: DateTime.now()
-              .subtract(Duration(hours: 24))
-              .millisecondsSinceEpoch,
-        )
-        .snapshots()
-        .map((event) {
-      List<Status> statuses = [];
-      for (var document in event.docs) {
-        statuses.add(Status.fromMap(document.data()));
+  // Method to get current user's own statuses
+  Future<List<Status>> getCurrentUserStatuses() async {
+    List<Status> statusData = [];
+
+    try {
+      String? currentUserId = auth.currentUser?.uid;
+      if (currentUserId == null) {
+        print('StatusRepository: No authenticated user');
+        return statusData;
       }
-      return statuses;
-    });
+
+      print(
+          'StatusRepository: Getting statuses for current user: $currentUserId');
+
+      final twentyFourHoursAgo =
+          DateTime.now().subtract(const Duration(hours: 24));
+
+      var userStatuses = await firestore
+          .collection('status')
+          .where('uid', isEqualTo: currentUserId)
+          .where('createdAt',
+              isGreaterThan: twentyFourHoursAgo.millisecondsSinceEpoch)
+          .get();
+
+      print(
+          'StatusRepository: Found ${userStatuses.docs.length} current user statuses');
+
+      for (var doc in userStatuses.docs) {
+        try {
+          Status status = Status.fromMap(doc.data());
+          statusData.add(status);
+          print('StatusRepository: Added current user status');
+        } catch (e) {
+          print(
+              'StatusRepository: Error parsing current user status ${doc.id}: $e');
+        }
+      }
+
+      statusData.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return statusData;
+    } catch (e) {
+      print('StatusRepository: Error getting current user statuses: $e');
+      return statusData;
+    }
+  }
+
+  // Method to get all statuses that current user can see
+  Future<List<Status>> getAllVisibleStatuses() async {
+    List<Status> statusData = [];
+
+    try {
+      String? currentUserId = auth.currentUser?.uid;
+      if (currentUserId == null) {
+        print('StatusRepository: No authenticated user');
+        return statusData;
+      }
+
+      print(
+          'StatusRepository: Getting all statuses visible to current user: $currentUserId');
+
+      final twentyFourHoursAgo =
+          DateTime.now().subtract(const Duration(hours: 24));
+
+      // Get all recent statuses where current user is in whoCanSee array
+      var visibleStatuses = await firestore
+          .collection('status')
+          .where('whoCanSee', arrayContains: currentUserId)
+          .where('createdAt',
+              isGreaterThan: twentyFourHoursAgo.millisecondsSinceEpoch)
+          .get();
+
+      print(
+          'StatusRepository: Found ${visibleStatuses.docs.length} visible statuses');
+
+      for (var doc in visibleStatuses.docs) {
+        try {
+          Status status = Status.fromMap(doc.data());
+          statusData.add(status);
+          print('StatusRepository: Added status from ${status.username}');
+        } catch (e) {
+          print('StatusRepository: Error parsing status ${doc.id}: $e');
+        }
+      }
+
+      statusData.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return statusData;
+    } catch (e) {
+      print('StatusRepository: Error getting visible statuses: $e');
+      return statusData;
+    }
+  }
+
+  // Combined method to get both current user's statuses and others' statuses
+  Future<List<Status>> getStatusDebug(BuildContext context) async {
+    List<Status> statusData = [];
+
+    try {
+      print('StatusRepository DEBUG: Starting getStatus method');
+
+      String? currentUserId = auth.currentUser?.uid;
+      if (currentUserId == null) {
+        print('StatusRepository DEBUG: No authenticated user');
+        return statusData;
+      }
+
+      print('StatusRepository DEBUG: Current user ID: $currentUserId');
+
+      // Get current user info
+      var currentUserDoc =
+          await firestore.collection('users').doc(currentUserId).get();
+      if (currentUserDoc.exists) {
+        var userData = currentUserDoc.data()!;
+        print(
+            'StatusRepository DEBUG: Current user: ${userData['name']} (${userData['email']})');
+      }
+
+      // First, let's check what statuses exist in the database
+      print('StatusRepository DEBUG: Checking all statuses in database...');
+      var allStatuses = await firestore.collection('status').get();
+      print(
+          'StatusRepository DEBUG: Total statuses in database: ${allStatuses.docs.length}');
+
+      final twentyFourHoursAgo =
+          DateTime.now().subtract(const Duration(hours: 24));
+      print(
+          'StatusRepository DEBUG: Looking for statuses after ${twentyFourHoursAgo.toIso8601String()}');
+
+      for (var doc in allStatuses.docs) {
+        var data = doc.data();
+        var createdAt = DateTime.fromMillisecondsSinceEpoch(data['createdAt']);
+        var isRecent = createdAt.isAfter(twentyFourHoursAgo);
+
+        print('StatusRepository DEBUG: Status doc ${doc.id}:');
+        print('  - username: ${data['username']}');
+        print('  - uid: ${data['uid']}');
+        print('  - createdAt: ${createdAt.toIso8601String()}');
+        print('  - isRecent (within 24h): $isRecent');
+        print('  - photoUrl length: ${(data['photoUrl'] as List).length}');
+        print('  - whoCanSee length: ${(data['whoCanSee'] as List).length}');
+        print(
+            '  - whoCanSee contains current user: ${(data['whoCanSee'] as List).contains(currentUserId)}');
+        print('  - is current user\'s status: ${data['uid'] == currentUserId}');
+
+        if (isRecent) {
+          try {
+            Status status = Status.fromMap(data);
+
+            // Include status if:
+            // 1. It's the current user's own status, OR
+            // 2. Current user is in the whoCanSee list
+            if (status.uid == currentUserId ||
+                status.whoCanSee.contains(currentUserId)) {
+              statusData.add(status);
+              print(
+                  'StatusRepository DEBUG: ADDED status from ${status.username}');
+            } else {
+              print(
+                  'StatusRepository DEBUG: SKIPPED status from ${status.username} (not visible to current user)');
+            }
+          } catch (e) {
+            print('StatusRepository DEBUG: Error parsing status ${doc.id}: $e');
+          }
+        }
+      }
+
+      print('StatusRepository DEBUG: Final status count: ${statusData.length}');
+      statusData.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return statusData;
+    } catch (e, stackTrace) {
+      print('StatusRepository DEBUG: Major error in getStatus: $e');
+      print('StatusRepository DEBUG: Stack trace: $stackTrace');
+      return statusData;
+    }
   }
 }

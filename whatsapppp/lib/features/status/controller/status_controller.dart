@@ -72,9 +72,30 @@ class StatusController {
     });
   }
 
-  // Get statuses stream
-  Stream<List<Status>> getStatus() {
-    return statusRepository.getStatus();
+  // Get all statuses (including current user's own statuses)
+  Future<List<Status>> getStatus(BuildContext context) async {
+    print('StatusController: Getting all statuses');
+    List<Status> statuses = await statusRepository.getStatusDebug(context);
+    print('StatusController: Retrieved ${statuses.length} statuses');
+    return statuses;
+  }
+
+  // Get only current user's statuses
+  Future<List<Status>> getCurrentUserStatuses() async {
+    print('StatusController: Getting current user statuses');
+    List<Status> statuses = await statusRepository.getCurrentUserStatuses();
+    print(
+        'StatusController: Retrieved ${statuses.length} current user statuses');
+    return statuses;
+  }
+
+  // Get only other users' statuses that current user can see
+  Future<List<Status>> getOtherUsersStatuses() async {
+    print('StatusController: Getting other users statuses');
+    List<Status> statuses = await statusRepository.getAllVisibleStatuses();
+    print(
+        'StatusController: Retrieved ${statuses.length} other users statuses');
+    return statuses;
   }
 
   // Method to get blob data by ID
