@@ -6,6 +6,7 @@ import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/features/auth/screens/sign_up_screen.dart';
 import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
 import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
+import 'package:whatsapppp/features/group/screens/create_group_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
@@ -92,6 +93,12 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
       final status = settings.arguments as Status;
       return MaterialPageRoute(
         builder: (_) => StatusScreen(status: status),
+      );
+
+    // GROUP SCREENS
+    case CreateGroupScreen.routeName:
+      return MaterialPageRoute(
+        builder: (_) => CreateGroupScreen(),
       );
 
     // ERROR SCREEN

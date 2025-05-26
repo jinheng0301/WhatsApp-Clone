@@ -25,7 +25,7 @@ final searchUsersProvider = FutureProvider.family<List<UserModel>, String>((ref,
 });
 
 class SelectContactController {
-  final ProviderRef ref;
+  final Ref ref;
   final SelectContactRepository selectContactRepository;
 
   SelectContactController({
