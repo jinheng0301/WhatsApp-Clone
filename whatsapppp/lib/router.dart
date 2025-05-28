@@ -95,7 +95,7 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         builder: (_) => StatusScreen(status: status),
       );
 
-    // GROUP SCREENS
+    // GROUP SCREEN
     case CreateGroupScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => CreateGroupScreen(),

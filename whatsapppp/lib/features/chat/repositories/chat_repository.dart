@@ -375,15 +375,34 @@ class ChatRepository {
 
   // GET CHAT GROUPS
   Stream<List<GroupChat>> getChatGroups() {
-    return firestore.collection('groups').snapshots().map((event) {
+    print('getChatGroups: Starting stream for user: ${auth.currentUser?.uid}');
+
+    // Query only groups where the current user is a member
+    // This avoids the permission denied error
+    return firestore
+        .collection('groups')
+        .where('membersUid', arrayContains: auth.currentUser!.uid)
+        .snapshots()
+        .map((event) {
+      print('getChatGroups: Received ${event.docs.length} group documents');
       List<GroupChat> groups = [];
+
       for (var document in event.docs) {
-        var group = GroupChat.fromMap(document.data());
-        if (group.membersUid.contains(auth.currentUser!.uid)) {
+        try {
+          var group = GroupChat.fromMap(document.data());
           groups.add(group);
+          print('getChatGroups: Added group: ${group.name}');
+        } catch (e) {
+          print(
+              'getChatGroups: Error parsing group document ${document.id}: $e');
         }
       }
+
+      print('getChatGroups: Returning ${groups.length} groups');
       return groups;
+    }).handleError((error) {
+      print('getChatGroups: Stream error: $error');
+      return <GroupChat>[];
     });
   }
 
