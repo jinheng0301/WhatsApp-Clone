@@ -92,7 +92,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
           ContactsList(),
           StatusContactsScreen(),
           Center(
-            child: Text('Calls'),
+            child: Text('Editing screens coming soon!'),
           ),
           Center(
             child: Text('Profile'),
@@ -124,7 +124,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
             ),
             BottomNavigationBarItem(
               icon: Icon(
-                Icons.call,
+                Icons.tiktok_outlined,
                 size: 30,
                 color: _page == 2 ? primaryColor : secondaryColor,
               ),
@@ -165,6 +165,21 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
               },
               backgroundColor: tabColor,
               child: Icon(Icons.camera_alt, size: 30, color: Colors.white),
+            );
+            case 2: 
+            return FloatingActionButton(
+              onPressed: () async {
+                File? pickedImage = await pickImageFromGallery(context);
+                if (pickedImage != null) {
+                  Navigator.pushNamed(
+                    context,
+                    ConfirmStatusScreen.routeName,
+                    arguments: pickedImage,
+                  );
+                }
+              },
+              backgroundColor: tabColor,
+              child: Icon(Icons.edit, size: 30, color: Colors.white),
             );
           default:
             return null;

@@ -1,132 +1,132 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:riverpod/riverpod.dart';
-import 'package:whatsapppp/common/utils/utils.dart';
-import 'package:whatsapppp/features/call/screens/call_screen.dart';
-import 'package:whatsapppp/models/call.dart';
-import 'package:whatsapppp/models/group.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:flutter/material.dart';
+// import 'package:riverpod/riverpod.dart';
+// import 'package:whatsapppp/common/utils/utils.dart';
+// import 'package:whatsapppp/features/call/screens/call_screen.dart';
+// import 'package:whatsapppp/models/call.dart';
+// import 'package:whatsapppp/models/group.dart';
 
-final callRepositoryProvider = Provider(
-  (ref) => CallRepository(
-    firestore: FirebaseFirestore.instance,
-    auth: FirebaseAuth.instance,
-  ),
-);
+// final callRepositoryProvider = Provider(
+//   (ref) => CallRepository(
+//     firestore: FirebaseFirestore.instance,
+//     auth: FirebaseAuth.instance,
+//   ),
+// );
 
-class CallRepository {
-  final FirebaseFirestore firestore;
-  final FirebaseAuth auth;
+// class CallRepository {
+//   final FirebaseFirestore firestore;
+//   final FirebaseAuth auth;
 
-  CallRepository({
-    required this.firestore,
-    required this.auth,
-  });
+//   CallRepository({
+//     required this.firestore,
+//     required this.auth,
+//   });
 
-  Stream<DocumentSnapshot> get callStream =>
-      firestore.collection('call').doc(auth.currentUser!.uid).snapshots();
+//   Stream<DocumentSnapshot> get callStream =>
+//       firestore.collection('call').doc(auth.currentUser!.uid).snapshots();
 
-  // Initiates a call by saving the call data to Firestore and navigating to the CallScreen.
-  void makeCall(
-    BuildContext context,
-    Call senderCallData,
-    Call receiverCallData,
-  ) async {
-    try {
-      await firestore
-          .collection('call')
-          .doc(senderCallData.callerId)
-          .set(senderCallData.toMap());
-      await firestore
-          .collection('call')
-          .doc(senderCallData.receiverId)
-          .set(receiverCallData.toMap());
+//   // Initiates a call by saving the call data to Firestore and navigating to the CallScreen.
+//   void makeCall(
+//     BuildContext context,
+//     Call senderCallData,
+//     Call receiverCallData,
+//   ) async {
+//     try {
+//       await firestore
+//           .collection('call')
+//           .doc(senderCallData.callerId)
+//           .set(senderCallData.toMap());
+//       await firestore
+//           .collection('call')
+//           .doc(senderCallData.receiverId)
+//           .set(receiverCallData.toMap());
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CallScreen(
-            channelId: senderCallData.callId,
-            call: senderCallData,
-            isGroupChat: false,
-          ),
-        ),
-      );
-    } catch (e) {
-      showSnackBar(context, e.toString());
-    }
-  }
+//       Navigator.push(
+//         context,
+//         MaterialPageRoute(
+//           builder: (context) => CallScreen(
+//             channelId: senderCallData.callId,
+//             call: senderCallData,
+//             isGroupChat: false,
+//           ),
+//         ),
+//       );
+//     } catch (e) {
+//       showSnackBar(context, e.toString());
+//     }
+//   }
 
-  void makeGroupCall(
-    Call senderCallData,
-    BuildContext context,
-    Call receiverCallData,
-  ) async {
-    try {
-      await firestore
-          .collection('call')
-          .doc(senderCallData.callerId)
-          .set(senderCallData.toMap());
+//   void makeGroupCall(
+//     Call senderCallData,
+//     BuildContext context,
+//     Call receiverCallData,
+//   ) async {
+//     try {
+//       await firestore
+//           .collection('call')
+//           .doc(senderCallData.callerId)
+//           .set(senderCallData.toMap());
 
-      var groupSnapshot = await firestore
-          .collection('groups')
-          .doc(senderCallData.receiverId)
-          .get();
+//       var groupSnapshot = await firestore
+//           .collection('groups')
+//           .doc(senderCallData.receiverId)
+//           .get();
 
-      GroupChat group = GroupChat.fromMap(groupSnapshot.data()!);
+//       GroupChat group = GroupChat.fromMap(groupSnapshot.data()!);
 
-      for (var id in group.membersUid) {
-        await firestore
-            .collection('call')
-            .doc(id)
-            .set(receiverCallData.toMap());
-      }
+//       for (var id in group.membersUid) {
+//         await firestore
+//             .collection('call')
+//             .doc(id)
+//             .set(receiverCallData.toMap());
+//       }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CallScreen(
-            channelId: senderCallData.callId,
-            call: senderCallData,
-            isGroupChat: true,
-          ),
-        ),
-      );
-    } catch (e) {
-      showSnackBar(context, e.toString());
-    }
-  }
+//       Navigator.push(
+//         context,
+//         MaterialPageRoute(
+//           builder: (context) => CallScreen(
+//             channelId: senderCallData.callId,
+//             call: senderCallData,
+//             isGroupChat: true,
+//           ),
+//         ),
+//       );
+//     } catch (e) {
+//       showSnackBar(context, e.toString());
+//     }
+//   }
 
-  void endCall(
-    String callerId,
-    String receiverId,
-    BuildContext context,
-  ) async {
-    try {
-      await firestore.collection('call').doc(callerId).delete();
-      await firestore.collection('call').doc(receiverId).delete();
-    } catch (e) {
-      showSnackBar(context, e.toString());
-    }
-  }
+//   void endCall(
+//     String callerId,
+//     String receiverId,
+//     BuildContext context,
+//   ) async {
+//     try {
+//       await firestore.collection('call').doc(callerId).delete();
+//       await firestore.collection('call').doc(receiverId).delete();
+//     } catch (e) {
+//       showSnackBar(context, e.toString());
+//     }
+//   }
 
-  void endGroupCall(
-    String callerId,
-    String receiverId,
-    BuildContext context,
-  ) async {
-    try {
-      await firestore.collection('call').doc(callerId).delete();
-      var groupSnapshot =
-          await firestore.collection('groups').doc(receiverId).get();
+//   void endGroupCall(
+//     String callerId,
+//     String receiverId,
+//     BuildContext context,
+//   ) async {
+//     try {
+//       await firestore.collection('call').doc(callerId).delete();
+//       var groupSnapshot =
+//           await firestore.collection('groups').doc(receiverId).get();
 
-      GroupChat group = GroupChat.fromMap(groupSnapshot.data()!);
+//       GroupChat group = GroupChat.fromMap(groupSnapshot.data()!);
       
-      for (var id in group.membersUid) {
-        await firestore.collection('call').doc(id).delete();
-      }
-    } catch (e) {
-      showSnackBar(context, e.toString());
-    }
-  }
-}
+//       for (var id in group.membersUid) {
+//         await firestore.collection('call').doc(id).delete();
+//       }
+//     } catch (e) {
+//       showSnackBar(context, e.toString());
+//     }
+//   }
+// }
