@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/chat/widgets/contacts_list.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
@@ -195,10 +196,32 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
               label: '',
             ),
             BottomNavigationBarItem(
-              icon: Icon(
-                Icons.person,
-                size: 30,
-                color: _page == 3 ? primaryColor : secondaryColor,
+              icon: Consumer(
+                builder: (context, ref, _) {
+                  final userAsync = ref.watch(userDataAuthProvider);
+                  return userAsync.when(
+                    data: (user) {
+                      if (user == null) {
+                        return Icon(
+                          Icons.person,
+                          size: 30,
+                          color: _page == 3 ? primaryColor : secondaryColor,
+                        );
+                      } else {
+                        return CircleAvatar(
+                          radius: 15,
+                          backgroundImage: NetworkImage(user.profilePic),
+                        );
+                      }
+                    },
+                    loading: () => const Loader(),
+                    error: (err, stack) => const Icon(
+                      Icons.error,
+                      size: 30,
+                      color: Colors.red,
+                    ),
+                  );
+                },
               ),
               label: '',
             ),
