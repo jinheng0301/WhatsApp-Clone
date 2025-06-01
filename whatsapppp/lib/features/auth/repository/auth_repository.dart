@@ -131,6 +131,14 @@ class AuthRepository {
 
       await auth.signInWithEmailAndPassword(email: email, password: password);
 
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const MobileLayoutScreen()),
+        (route) => false,
+      );
+
+      showSnackBar(context, 'Sign in successfully!');
+
       // No need to navigate here - the authStateChanges will trigger navigation
     } on FirebaseAuthException catch (e) {
       // More specific error handling
@@ -160,6 +168,8 @@ class AuthRepository {
         MaterialPageRoute(builder: (context) => LoginScreen()),
         (route) => false,
       );
+
+      showSnackBar(context, 'Log out successfully!');
     } catch (e) {
       showSnackBar(context, e.toString());
     }

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod/riverpod.dart';
 import 'package:whatsapppp/features/auth/repository/auth_repository.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
@@ -92,5 +91,9 @@ class AuthController {
 
   void setUserState(bool isOnline) {
     authRepository.setUserState(isOnline);
+  }
+
+  Future<void> signOut({required BuildContext context}) async {
+    return await authRepository.signOut(context);
   }
 }
