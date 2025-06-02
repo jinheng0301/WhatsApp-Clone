@@ -8,6 +8,7 @@ import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/chat/widgets/contacts_list.dart';
+import 'package:whatsapppp/features/multimedia_editing/screens/multimedia_editing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_contacts_screen.dart';
@@ -158,9 +159,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         children: [
           ContactsList(),
           StatusContactsScreen(),
-          Center(
-            child: Text('Editing screens coming soon!'),
-          ),
+          MultimediaEditingScreen(),
           ProfileScreen(),
         ],
       ),

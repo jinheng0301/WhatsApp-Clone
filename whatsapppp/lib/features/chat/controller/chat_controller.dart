@@ -157,15 +157,21 @@ class ChatController {
         );
   }
 
+  Future<int> getGroupMemberCount(String groupId) {
+    return chatRepository.getGroupMemberCount(groupId);
+  }
+
   void setChatMessageSeen(
     BuildContext context,
     String recieverUserId,
     String messageId,
+    bool isGroupChat,
   ) {
     chatRepository.setChatMessageSeen(
       context,
       recieverUserId,
       messageId,
+      isGroupChat,
     );
   }
 }

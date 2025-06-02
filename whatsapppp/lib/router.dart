@@ -8,6 +8,7 @@ import 'package:whatsapppp/features/auth/screens/user_information_screen.dart';
 import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/features/group/screens/create_group_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
+import 'package:whatsapppp/features/multimedia_editing/screens/multimedia_editing_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_screen.dart';
@@ -106,6 +107,12 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
     case ProfileScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => ProfileScreen(),
+      );
+
+    // MULTIMEDIA EDITNG SCREEN
+    case MultimediaEditingScreen.routeName:
+      return MaterialPageRoute(
+        builder: (_) => MultimediaEditingScreen(),
       );
 
     // ERROR SCREEN

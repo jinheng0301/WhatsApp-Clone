@@ -9,7 +9,7 @@ import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/firebase_options.dart';
 import 'package:whatsapppp/router.dart';
-import 'package:whatsapppp/screens/mobile_screen_layout.dart';
+import 'package:whatsapppp/screens/mobile_layout_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
 void main() async {

@@ -9,7 +9,7 @@ import 'package:whatsapppp/common/repositories/common_firebase_storage_repositor
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/features/auth/screens/login_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
-import 'package:whatsapppp/screens/mobile_screen_layout.dart';
+import 'package:whatsapppp/screens/mobile_layout_screen.dart';
 
 final authRepositoryProvider = Provider(
   (ref) => AuthRepository(
