@@ -238,7 +238,6 @@ class ChatRepository {
 
   // Enhanced _saveMessageToMessageSubcollection with better error handling
   // This method is used to save the message data to the message subcollection
-  // Modified _saveMessageToMessageSubcollection to handle group chat seen status
   Future<void> _saveMessageToMessageSubcollection({
     required String recieverUserId,
     required String text,
@@ -254,59 +253,40 @@ class ChatRepository {
     try {
       print('_saveMessageToMessageSubcollection: Starting');
 
-      if (isGroupChat) {
-        // For group chats, create message with seenBy map
-        final groupMessage = {
-          'senderId': auth.currentUser!.uid,
-          'recieverid': recieverUserId,
-          'text': text,
-          'type': messageType.type,
-          'timeSent': timeSent.millisecondsSinceEpoch,
-          'messageId': messageId,
-          'isSeen': false, // Keep for backward compatibility
-          'seenBy': <String, int>{}, // Map of userId -> timestamp when seen
-          'repliedMessage': messageReply == null ? '' : messageReply.message,
-          'repliedTo': messageReply == null
-              ? ''
-              : messageReply.isMe
-                  ? senderUsername
-                  : recieverUserName ?? '',
-          'repliedMessageType': messageReply == null
-              ? MessageEnum.text.type
-              : messageReply.messageEnum.type,
-        };
+      final message = Message(
+        senderId: auth.currentUser!.uid,
+        recieverid: recieverUserId,
+        text: text,
+        type: messageType,
+        timeSent: timeSent,
+        messageId: messageId,
+        isSeen: false,
+        repliedMessage: messageReply == null ? '' : messageReply.message,
+        repliedTo: messageReply == null
+            ? ''
+            : messageReply.isMe
+                ? senderUsername
+                : recieverUserName ?? '',
+        repliedMessageType:
+            messageReply == null ? MessageEnum.text : messageReply.messageEnum,
+      );
 
+      print('_saveMessageToMessageSubcollection: Message object created');
+
+      if (isGroupChat) {
         print('_saveMessageToMessageSubcollection: Saving group message');
         await firestore
             .collection('groups')
             .doc(recieverUserId)
             .collection('chats')
             .doc(messageId)
-            .set(groupMessage);
+            .set(message.toMap());
       } else {
-        // Original individual chat logic
-        final message = Message(
-          senderId: auth.currentUser!.uid,
-          recieverid: recieverUserId,
-          text: text,
-          type: messageType,
-          timeSent: timeSent,
-          messageId: messageId,
-          isSeen: false,
-          repliedMessage: messageReply == null ? '' : messageReply.message,
-          repliedTo: messageReply == null
-              ? ''
-              : messageReply.isMe
-                  ? senderUsername
-                  : recieverUserName ?? '',
-          repliedMessageType: messageReply == null
-              ? MessageEnum.text
-              : messageReply.messageEnum,
-        );
-
         print('_saveMessageToMessageSubcollection: Saving individual messages');
 
         // Save to sender's message collection
+        print(
+            '_saveMessageToMessageSubcollection: Saving to sender collection');
         await firestore
             .collection('users')
             .doc(auth.currentUser!.uid)
@@ -317,6 +297,8 @@ class ChatRepository {
             .set(message.toMap());
 
         // Save to receiver's message collection
+        print(
+            '_saveMessageToMessageSubcollection: Saving to receiver collection');
         await firestore
             .collection('users')
             .doc(recieverUserId)
@@ -330,32 +312,8 @@ class ChatRepository {
       print('_saveMessageToMessageSubcollection: Completed successfully');
     } catch (e) {
       print('_saveMessageToMessageSubcollection: Error: $e');
-      throw e;
+      throw e; // Re-throw to be caught by the calling function
     }
-  }
-
-  // Helper function to check if a group message has been seen by current user
-  bool isGroupMessageSeenByCurrentUser(Map<String, dynamic> messageData) {
-    final seenBy = messageData['seenBy'] as Map<String, dynamic>?;
-    if (seenBy == null) return false;
-
-    return seenBy.containsKey(auth.currentUser!.uid);
-  }
-
-  // Helper function to get the list of users who have seen a group message
-  List<String> getUsersWhoSeenMessage(Map<String, dynamic> messageData) {
-    final seenBy = messageData['seenBy'] as Map<String, dynamic>?;
-    if (seenBy == null) return [];
-
-    return seenBy.keys.toList();
-  }
-
-  // Helper function to get seen count for a group message
-  int getSeenCount(Map<String, dynamic> messageData) {
-    final seenBy = messageData['seenBy'] as Map<String, dynamic>?;
-    if (seenBy == null) return 0;
-
-    return seenBy.length;
   }
 
   // GET CHAT CONTACTS
@@ -509,35 +467,6 @@ class ChatRepository {
       showSnackBar(context, 'Group created successfully!');
     } catch (e) {
       showSnackBar(context, 'Error creating group: ${e.toString()}');
-    }
-  }
-
-  // GET GROUP MEMBER COUNT
-  Future<int> getGroupMemberCount(String groupId) async {
-    try {
-      final groupDoc = await firestore.collection('groups').doc(groupId).get();
-
-      if (!groupDoc.exists) {
-        print('Group document does not exist');
-        return 0;
-      }
-
-      final groupData = groupDoc.data();
-      if (groupData == null) {
-        print('Group data is null');
-        return 0;
-      }
-
-      final membersUid = groupData['membersUid'] as List<dynamic>?;
-      if (membersUid == null) {
-        print('Members list is null');
-        return 0;
-      }
-
-      return membersUid.length;
-    } catch (e) {
-      print('Error getting group member count: $e');
-      return 0;
     }
   }
 
@@ -722,43 +651,26 @@ class ChatRepository {
     BuildContext context,
     String recieverUserId,
     String messageId,
-    bool isGroupChat,
   ) async {
     try {
-      if (isGroupChat) {
-        // For group chats, update the seen status in the group's chat collection
-        await firestore
-            .collection('groups')
-            .doc(
-                recieverUserId) // recieverUserId is actually groupId in group chats
-            .collection('chats')
-            .doc(messageId)
-            .update({
-          'seenBy.${auth.currentUser!.uid}':
-              DateTime.now().millisecondsSinceEpoch,
-        });
-      } else {
-        // Original individual chat logic
-        await firestore
-            .collection('users')
-            .doc(auth.currentUser!.uid)
-            .collection('chats')
-            .doc(recieverUserId)
-            .collection('messages')
-            .doc(messageId)
-            .update({'isSeen': true});
+      await firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('chats')
+          .doc(recieverUserId)
+          .collection('messages')
+          .doc(messageId)
+          .update({'isSeen': true});
 
-        await firestore
-            .collection('users')
-            .doc(recieverUserId)
-            .collection('chats')
-            .doc(auth.currentUser!.uid)
-            .collection('messages')
-            .doc(messageId)
-            .update({'isSeen': true});
-      }
+      await firestore
+          .collection('users')
+          .doc(recieverUserId)
+          .collection('chats')
+          .doc(auth.currentUser!.uid)
+          .collection('messages')
+          .doc(messageId)
+          .update({'isSeen': true});
     } catch (e) {
-      print('Error setting message as seen: $e');
       showSnackBar(context, e.toString());
     }
   }

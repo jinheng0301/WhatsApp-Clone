@@ -12,10 +12,9 @@ class SenderMessageCard extends StatelessWidget {
   late final String repliedText;
   late final String username;
   late final MessageEnum repliedMessageType;
-  // New parameters for group chat
   late final bool isGroupChat;
-  late final String senderName;
-  late final String senderProfilePic;
+  late final String? senderProfilePic;
+  late final String? senderName;
 
   SenderMessageCard({
     required this.message,
@@ -25,10 +24,9 @@ class SenderMessageCard extends StatelessWidget {
     required this.repliedText,
     required this.username,
     required this.repliedMessageType,
-    // New required parameters for group chat
     this.isGroupChat = false,
-    this.senderName = '',
-    this.senderProfilePic = '',
+    this.senderProfilePic,
+    this.senderName,
   });
 
   // Helper method to generate consistent colors for usernames
@@ -44,8 +42,8 @@ class SenderMessageCard extends StatelessWidget {
       Colors.indigo[300]!,
     ];
 
-    int hash = name.hashCode;
-    int index = hash.abs() % colors.length;
+    // Use the hash code to consistently assign colors
+    final index = name.hashCode.abs() % colors.length;
     return colors[index];
   }
 
@@ -58,93 +56,88 @@ class SenderMessageCard extends StatelessWidget {
       onRightSwipe: onRightSwipe,
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 8.0,
-            vertical: 3.0,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: width - 45,
           ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: width *
-                  0.75, // Reduced from width - 45 to 75% of screen width
-              minWidth: 120, // Added minimum width
+          child: Container(
+            margin: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 5,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // always show profile picture in group chats and individual chats
-                Container(
-                  margin: const EdgeInsets.only(right: 6.0, bottom: 8.0),
-                  child: CircleAvatar(
+                // Profile picture for group chats
+                if (isGroupChat) ...[
+                  CircleAvatar(
                     radius: 18,
-                    backgroundImage: senderProfilePic.isNotEmpty
-                        ? NetworkImage(senderProfilePic)
-                        : null,
-                    backgroundColor: Colors.grey[400],
-                    child: senderProfilePic.isEmpty
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage:
+                        senderProfilePic != null && senderProfilePic!.isNotEmpty
+                            ? NetworkImage(senderProfilePic!)
+                            : null,
+                    child: senderProfilePic == null || senderProfilePic!.isEmpty
                         ? Icon(
                             Icons.person,
-                            size: 22,
-                            color: Colors.grey[700],
+                            size: 20,
+                            color: Colors.grey[600],
                           )
                         : null,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                ],
 
+                // Message content
                 Flexible(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: senderMessageColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          offset: const Offset(0, 1),
-                          blurRadius: 2,
-                        ),
-                      ],
+                  child: Card(
+                    color: senderMessageColor,
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Stack(
                       children: [
                         Padding(
                           padding: type == MessageEnum.text
-                              ? const EdgeInsets.fromLTRB(14, 8, 50, 20)
-                              : const EdgeInsets.fromLTRB(8, 6, 8, 22),
+                              ? const EdgeInsets.only(
+                                  left: 12,
+                                  right: 30,
+                                  top: 8,
+                                  bottom: 22,
+                                )
+                              : const EdgeInsets.only(
+                                  left: 8,
+                                  top: 8,
+                                  right: 8,
+                                  bottom: 28,
+                                ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // always show sender name if not empty
-                              if (senderName.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4.0),
-                                  child: Text(
-                                    senderName,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                      color: _getRandomColor(senderName),
-                                      letterSpacing: 0.1,
-                                    ),
+                              // Sender name for group chats
+                              if (isGroupChat && senderName != null) ...[
+                                Text(
+                                  senderName!,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: _getRandomColor(senderName!),
                                   ),
                                 ),
+                                const SizedBox(height: 4),
                               ],
+
+                              // Replied message section
                               if (isReplying) ...[
                                 Container(
-                                  margin: const EdgeInsets.only(bottom: 6),
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: backgroundColor.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border(
                                       left: BorderSide(
-                                        color: _getRandomColor(username),
+                                        color: Colors.white70,
                                         width: 3,
                                       ),
                                     ),
@@ -155,13 +148,13 @@ class SenderMessageCard extends StatelessWidget {
                                     children: [
                                       Text(
                                         username,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12,
-                                          color: _getRandomColor(username),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: Colors.white70,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: 4),
                                       DisplayTextImageGif(
                                         message: repliedText,
                                         type: repliedMessageType,
@@ -169,7 +162,10 @@ class SenderMessageCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 8),
                               ],
+
+                              // Main message content
                               DisplayTextImageGif(
                                 message: message,
                                 type: type,
@@ -177,25 +173,16 @@ class SenderMessageCard extends StatelessWidget {
                             ],
                           ),
                         ),
+
+                        // Timestamp
                         Positioned(
-                          bottom: 6,
-                          right: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              date,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          bottom: 4,
+                          right: 10,
+                          child: Text(
+                            date,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
                             ),
                           ),
                         ),

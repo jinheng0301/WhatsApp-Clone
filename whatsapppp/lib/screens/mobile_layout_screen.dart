@@ -110,7 +110,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
               color: Colors.grey,
             ),
             onSelected: (value) {
-              if (value == ' create_group') {
+              if (value == 'create_group') {
                 Navigator.pushNamed(context, '/create-group');
               } else if (value == 'add_status') {
                 Navigator.pushNamed(context, '/add-status');
@@ -155,7 +155,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
       body: PageView(
         controller: pageController,
         onPageChanged: onPageChanged,
-        physics: AlwaysScrollableScrollPhysics(),
+        physics: NeverScrollableScrollPhysics(),
         children: [
           ContactsList(),
           StatusContactsScreen(),
