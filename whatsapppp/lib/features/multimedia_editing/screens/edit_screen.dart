@@ -1,11 +1,15 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_trimmer/video_trimmer.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/common/widgets/emoji_stickers.dart';
 import 'package:whatsapppp/features/multimedia_editing/controller/media_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/widgets/preview_panel.dart';
 import 'package:whatsapppp/features/multimedia_editing/widgets/timeline_editor.dart';
@@ -96,16 +100,36 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   Size? _lastOriginalSize;
   final List<String> _toolTabs = [
     'Edit',
-    'Audio',
     'Text',
+    'Audio',
     'Effects',
     'Filters'
+  ];
+
+  TextEditingController _textController = TextEditingController();
+  Color _selectedTextColor = Colors.white;
+  double _textSize = 24.0;
+  bool _isBold = false;
+  bool _isItalic = false;
+  String _selectedFont = 'Roboto'; // Default font
+  final List<String> availableFonts = [
+    'Roboto',
+    'Lobster',
+    'Pacifico',
+    'Comic Sans MS'
   ];
 
   @override
   void initState() {
     super.initState();
     _media = ref.read(mediaControllerProvider);
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _textController.dispose();
   }
 
   @override
@@ -178,10 +202,10 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     switch (_toolTabs[_selectedTabIndex]) {
       case 'Edit':
         return _buildEditTools();
-      case 'Audio':
-        return _buildAudioTools();
       case 'Text':
         return _buildTextTools();
+      case 'Audio':
+        return _buildAudioTools();
       case 'Effects':
         return _buildEffectTools();
       case 'Filters':
@@ -210,13 +234,29 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         ] else ...[
           _toolButton(Icons.crop, 'Crop', onTap: _cropImage),
           _toolButton(Icons.filter, 'Filter', onTap: _applyGrayscaleFilter),
-          _toolButton(Icons.text_fields, 'Text', onTap: _showTextEditor),
           _toolButton(
-            Icons.emoji_emotions,
-            'Stickers',
-            onTap: _showStickerPicker,
-          ),
+            Icons.rotate_90_degrees_ccw,
+            'Rotate',
+            onTap: () => _rotateImage(90),
+          )
         ],
+      ],
+    );
+  }
+
+  Widget _buildTextTools() {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.text_fields),
+          title: const Text('Add Text'),
+          onTap: _showTextEditor,
+        ),
+        ListTile(
+          leading: const Icon(Icons.emoji_emotions),
+          title: const Text('Stickers'),
+          onTap: _showStickerPicker,
+        ),
       ],
     );
   }
@@ -239,21 +279,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           title: const Text('Voice Over'),
           onTap: _addVoiceOver,
         ),
-      ],
-    );
-  }
-
-  Widget _buildTextTools() {
-    return Column(
-      children: [
-        ListTile(
-            leading: const Icon(Icons.text_fields),
-            title: const Text('Add Text'),
-            onTap: _showTextEditor),
-        ListTile(
-            leading: const Icon(Icons.emoji_emotions),
-            title: const Text('Stickers'),
-            onTap: _showStickerPicker),
       ],
     );
   }
@@ -510,6 +535,21 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     setState(() => widget.mediaPath = output);
   }
 
+  Future<void> _rotateImage(int degrees) async {
+    final file = File(widget.mediaPath);
+    final bytes = await file.readAsBytes();
+    final image = img.decodeImage(bytes);
+    if (image == null) return;
+
+    final rotated = img.copyRotate(image, angle: degrees);
+    final output = '${widget.mediaPath}_rotated.jpg';
+    await File(output).writeAsBytes(img.encodeJpg(rotated));
+
+    _media.setCurrentMediaFile(File(output));
+    setState(() => widget.mediaPath = output);
+    showSnackBar(context, 'Image rotated');
+  }
+
   Future<void> _trimVideo() async {
     if (!widget.isVideo) return;
     final range = await showDialog<DurationRange>(
@@ -541,9 +581,286 @@ class _EditScreenState extends ConsumerState<EditScreen> {
 
   void _addVoiceOver() {/* implement recording UI */}
 
-  void _showTextEditor() {/* implement text editor */}
+  void _showTextEditor() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Add Text'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Text input field
+                    TextField(
+                      controller: _textController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your text here...',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
 
-  void _showStickerPicker() {/* implement stickers */}
+                    // Font selection
+                    DropdownButtonFormField<String>(
+                      value: _selectedFont,
+                      decoration: const InputDecoration(
+                        labelText: 'Font',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: availableFonts.map((font) {
+                        return DropdownMenuItem(
+                          value: font,
+                          child: Text(
+                            font,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedFont = value!);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Text size slider
+                    Row(
+                      children: [
+                        const Text('Size: '),
+                        Expanded(
+                          child: Slider(
+                            value: _textSize,
+                            min: 12.0,
+                            max: 72.0,
+                            divisions: 60,
+                            label: _textSize.round().toString(),
+                            onChanged: (value) {
+                              setState(() => _textSize = value);
+                            },
+                          ),
+                        ),
+                        Text('${_textSize.round()}'),
+                      ],
+                    ),
+
+                    // Text styling options
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _isBold,
+                          onChanged: (value) {
+                            setState(() => _isBold = value!);
+                          },
+                        ),
+                        const Text('Bold'),
+                        const SizedBox(width: 16),
+                        Checkbox(
+                          value: _isItalic,
+                          onChanged: (value) {
+                            setState(() => _isItalic = value!);
+                          },
+                        ),
+                        const Text('Italic'),
+                      ],
+                    ),
+
+                    // Color picker
+                    Row(
+                      children: [
+                        const Text('Color: '),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return AlertDialog(
+                                  title: const Text('Pick a color'),
+                                  content: SingleChildScrollView(
+                                    child: ColorPicker(
+                                      pickerColor: _selectedTextColor,
+                                      onColorChanged: (color) {
+                                        setState(
+                                            () => _selectedTextColor = color);
+                                      },
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text('Done'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: _selectedTextColor,
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Text preview
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _textController.text.isEmpty
+                            ? 'Preview text'
+                            : _textController.text,
+                        style: GoogleFonts.getFont(
+                          availableFonts.contains(_selectedFont)
+                              ? _selectedFont
+                              : 'Roboto',
+                          fontSize: _textSize,
+                          color: _selectedTextColor,
+                          fontWeight:
+                              _isBold ? FontWeight.bold : FontWeight.normal,
+                          fontStyle:
+                              _isItalic ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_textController.text.isNotEmpty) {
+                      _addTextToMedia();
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text('Add Text'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _addTextToMedia() async {
+    if (!widget.isVideo) {
+      // Add text to image
+      final result = await _media.addTextToImage(
+        imageFile: File(widget.mediaPath),
+        text: _textController.text,
+        position: const Offset(
+            50, 50), // Default position, you can make this interactive
+        fontSize: _textSize,
+        textColor: _selectedTextColor,
+        fontFamily: _selectedFont,
+        context: context,
+        isBold: _isBold,
+      );
+
+      if (result != null) {
+        setState(() => widget.mediaPath = result.path);
+      }
+    } else {
+      // For video, you would need to implement text overlay using FFmpeg
+      // This is more complex and would require additional implementation
+      showSnackBar(context, 'Text overlay for videos coming soon!');
+    }
+
+    // Clear the text controller
+    _textController.clear();
+  }
+
+  void _showStickerPicker() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose a Sticker'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: emojiStickers.length,
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _addStickerToMedia(emojiStickers[index]);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        emojiStickers[index],
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Method to add sticker to media
+  Future<void> _addStickerToMedia(String sticker) async {
+    if (!widget.isVideo) {
+      // Add sticker as text to image (since emojis are text)
+      final result = await _media.addTextToImage(
+        imageFile: File(widget.mediaPath),
+        text: sticker,
+        position: const Offset(100, 100), // Default position
+        fontSize: 48.0, // Large size for stickers
+        textColor: Colors.black, // Default color
+        fontFamily: 'system', // System font for better emoji support
+        context: context,
+        isBold: false,
+      );
+
+      if (result != null) {
+        setState(() => widget.mediaPath = result.path);
+      }
+    } else {
+      // For video stickers, you would need FFmpeg implementation
+      showSnackBar(context, 'Stickers for videos coming soon!');
+    }
+  }
 
   void _applyEffect(String effect) {
     /* implement FFmpeg effect via controller */
