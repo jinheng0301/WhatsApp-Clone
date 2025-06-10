@@ -32,6 +32,26 @@ Future<File?> pickImageFromGallery(BuildContext context) async {
   return image;
 }
 
+Future<File?> pickFromCamera(BuildContext context) async {
+  File? image;
+
+  try {
+    // picking image from the source of gallery
+    final pickedFromCamera = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+    );
+
+    // checking if picture is not equal to null
+    // converting the image to file
+    if (pickedFromCamera != null) {
+      image = File(pickedFromCamera.path);
+    }
+  } catch (e) {
+    showSnackBar(context, 'No image selected');
+  }
+  return image;
+}
+
 Future<File?> pickVideoFromGallery(BuildContext context) async {
   File? video;
   try {

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +9,7 @@ import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/chat/widgets/contacts_list.dart';
-import 'package:whatsapppp/features/multimedia_editing/screens/multimedia_editing_screen.dart';
+import 'package:whatsapppp/features/multimedia_editing/screens/new_project_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_contacts_screen.dart';
@@ -49,7 +50,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
     });
   }
 
-  Future<void> _showDialog() async {
+  Future<void> _showLogOutDialog() async {
     return showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -79,6 +80,78 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showMediaPickerDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Gallery'),
+              onTap: () => _pickFromGallery(),
+            ),
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Camera'),
+              onTap: () => _pickFromCamera(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFromGallery() async {
+    Navigator.pop(context); // Close dialog
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.media,
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final file = File(result.files.first.path!);
+      final isVideo = _isVideoFile(file.path);
+
+      Navigator.pushNamed(
+        context,
+        ConfirmStatusScreen.routeName,
+        arguments: {
+          'file': file,
+          'isVideo': isVideo,
+        },
+      );
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    Navigator.pop(context); // Close bottom sheet
+
+    final picker = pickFromCamera(context);
+    final result = await picker;
+
+    if (result != null) {
+      final file = File(result.path);
+      final isVideo = _isVideoFile(file.path);
+
+      Navigator.pushNamed(
+        context,
+        ConfirmStatusScreen.routeName,
+        arguments: {
+          'file': file,
+          'isVideo': isVideo,
+        },
+      );
+    }
+  }
+
+  bool _isVideoFile(String path) {
+    final videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+    return videoExtensions.any((ext) => path.toLowerCase().endsWith(ext));
   }
 
   @override
@@ -116,7 +189,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                 Navigator.pushNamed(context, '/add-status');
               } else if (value == 'logout') {
                 // show log out dialog
-                _showDialog();
+                _showLogOutDialog();
               }
             },
             itemBuilder: (BuildContext context) {
@@ -159,7 +232,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         children: [
           ContactsList(),
           StatusContactsScreen(),
-          MultimediaEditingScreen(),
+          NewProjectScreen(),
           ProfileScreen(),
         ],
       ),
@@ -255,14 +328,15 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
           case 2:
             return FloatingActionButton(
               onPressed: () async {
-                File? pickedImage = await pickImageFromGallery(context);
-                if (pickedImage != null) {
-                  Navigator.pushNamed(
-                    context,
-                    ConfirmStatusScreen.routeName,
-                    arguments: pickedImage,
-                  );
-                }
+                // File? pickedImage = await pickImageFromGallery(context);
+                // if (pickedImage != null) {
+                //   Navigator.pushNamed(
+                //     context,
+                //     ConfirmStatusScreen.routeName,
+                //     arguments: pickedImage,
+                //   );
+                // }
+                _showMediaPickerDialog();
               },
               backgroundColor: tabColor,
               child: Icon(Icons.edit, size: 30, color: Colors.white),
