@@ -119,6 +119,11 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     'Comic Sans MS'
   ];
 
+  // Reference to the PreviewPanel
+  final GlobalKey<PreviewPanelState> _previewPanelKey =
+      GlobalKey<PreviewPanelState>();
+  List<OverlayItem> _currentOverlays = [];
+
   @override
   void initState() {
     super.initState();
@@ -147,8 +152,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           Expanded(
             flex: 3,
             child: PreviewPanel(
+              key: _previewPanelKey,
               mediaPath: widget.mediaPath,
               isVideo: widget.isVideo,
+              onOverlaysChanged: (overlays) {
+                _currentOverlays = overlays;
+              },
             ),
           ),
           if (widget.isVideo) ...[
@@ -603,6 +612,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                       ),
                       maxLines: 3,
                     ),
+
                     const SizedBox(height: 16),
 
                     // Font selection
@@ -624,6 +634,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                         setState(() => _selectedFont = value!);
                       },
                     ),
+
                     const SizedBox(height: 16),
 
                     // Text size slider
@@ -683,7 +694,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                                       pickerColor: _selectedTextColor,
                                       onColorChanged: (color) {
                                         setState(
-                                            () => _selectedTextColor = color);
+                                          () => _selectedTextColor = color,
+                                        );
                                       },
                                     ),
                                   ),
@@ -747,7 +759,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (_textController.text.isNotEmpty) {
-                      _addTextToMedia();
+                      _addTextToPreview();
                       Navigator.of(context).pop();
                     }
                   },
@@ -761,32 +773,25 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     );
   }
 
-  Future<void> _addTextToMedia() async {
-    if (!widget.isVideo) {
-      // Add text to image
-      final result = await _media.addTextToImage(
-        imageFile: File(widget.mediaPath),
+  // Updated method to add text directly to preview panel
+  void _addTextToPreview() {
+    final previewPanelState = _previewPanelKey.currentState;
+    if (previewPanelState != null) {
+      previewPanelState.addTextOverlay(
         text: _textController.text,
-        position: const Offset(
-            50, 50), // Default position, you can make this interactive
         fontSize: _textSize,
-        textColor: _selectedTextColor,
+        color: _selectedTextColor,
         fontFamily: _selectedFont,
-        context: context,
         isBold: _isBold,
+        isItalic: _isItalic,
       );
-
-      if (result != null) {
-        setState(() => widget.mediaPath = result.path);
-      }
-    } else {
-      // For video, you would need to implement text overlay using FFmpeg
-      // This is more complex and would require additional implementation
-      showSnackBar(context, 'Text overlay for videos coming soon!');
     }
 
     // Clear the text controller
     _textController.clear();
+
+    showSnackBar(
+        context, 'Text added! You can now drag it around the preview.');
   }
 
   void _showStickerPicker() {
@@ -809,7 +814,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                 return GestureDetector(
                   onTap: () {
                     Navigator.of(context).pop();
-                    _addStickerToMedia(emojiStickers[index]);
+                    _addStickerToPreview(emojiStickers[index]);
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -839,36 +844,46 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   }
 
 // Method to add sticker to media
-  Future<void> _addStickerToMedia(String sticker) async {
-    if (!widget.isVideo) {
-      // Add sticker as text to image (since emojis are text)
-      final result = await _media.addTextToImage(
-        imageFile: File(widget.mediaPath),
-        text: sticker,
-        position: const Offset(100, 100), // Default position
-        fontSize: 48.0, // Large size for stickers
-        textColor: Colors.black, // Default color
-        fontFamily: 'system', // System font for better emoji support
-        context: context,
-        isBold: false,
-      );
-
-      if (result != null) {
-        setState(() => widget.mediaPath = result.path);
-      }
-    } else {
-      // For video stickers, you would need FFmpeg implementation
-      showSnackBar(context, 'Stickers for videos coming soon!');
+  void _addStickerToPreview(String sticker) {
+    final previewPanelState = _previewPanelKey.currentState;
+    if (previewPanelState != null) {
+      previewPanelState.addStickerOverlay(sticker);
     }
+
+    showSnackBar(
+        context, 'Sticker added! You can now drag it around the preview.');
   }
 
   void _applyEffect(String effect) {
     /* implement FFmpeg effect via controller */
   }
 
-  void _exportProject() {
-    // implement project export via controller
+  // Updated export method to include overlay information
+  void _exportProject() async {
+    // Get current overlays from preview panel
+    final previewPanelState = _previewPanelKey.currentState;
+    if (previewPanelState != null) {
+      final overlays = previewPanelState.overlayItems;
+
+      // Here you would implement the actual export logic
+      // For now, just show the overlay information
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Export Project'),
+          content:
+              Text('Ready to export with ${overlays.length} overlay items'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
+
   void _shareProject() {
     // implement share via controller
   }
