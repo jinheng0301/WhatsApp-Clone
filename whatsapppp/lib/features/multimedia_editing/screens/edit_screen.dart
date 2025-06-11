@@ -82,6 +82,7 @@ class _TrimmerDialogState extends State<TrimmerDialog> {
 }
 
 // EditScreen widget
+// ignore: must_be_immutable
 class EditScreen extends ConsumerStatefulWidget {
   String mediaPath;
   final bool isVideo;
@@ -116,7 +117,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     'Roboto',
     'Lobster',
     'Pacifico',
-    'Comic Sans MS'
   ];
 
   // Reference to the PreviewPanel
@@ -597,173 +597,314 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Add Text'),
+              title: Row(
+                children: [
+                  const Icon(Icons.text_fields, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  const Text('Add Text'),
+                ],
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Text input field
-                    TextField(
-                      controller: _textController,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter your text here...',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Font selection
-                    DropdownButtonFormField<String>(
-                      value: _selectedFont,
-                      decoration: const InputDecoration(
-                        labelText: 'Font',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: availableFonts.map((font) {
-                        return DropdownMenuItem(
-                          value: font,
-                          child: Text(
-                            font,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() => _selectedFont = value!);
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Text size slider
-                    Row(
-                      children: [
-                        const Text('Size: '),
-                        Expanded(
-                          child: Slider(
-                            value: _textSize,
-                            min: 12.0,
-                            max: 72.0,
-                            divisions: 60,
-                            label: _textSize.round().toString(),
-                            onChanged: (value) {
-                              setState(() => _textSize = value);
-                            },
-                          ),
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Text input field with enhanced styling
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey.shade50,
                         ),
-                        Text('${_textSize.round()}'),
-                      ],
-                    ),
+                        child: TextField(
+                          controller: _textController,
+                          decoration: const InputDecoration(
+                            hintText: 'Type your text here...',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.all(16),
+                            hintStyle: TextStyle(color: Colors.grey),
+                          ),
+                          maxLines: 3,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
 
-                    // Text styling options
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _isBold,
+                      const SizedBox(height: 20),
+
+                      // Font selection with preview
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedFont,
+                          decoration: const InputDecoration(
+                            labelText: 'Font Family',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            prefixIcon: Icon(Icons.font_download),
+                          ),
+                          items: availableFonts.map((font) {
+                            return DropdownMenuItem(
+                              value: font,
+                              child: Text(
+                                font,
+                                style: GoogleFonts.getFont(font, fontSize: 16),
+                              ),
+                            );
+                          }).toList(),
                           onChanged: (value) {
-                            setState(() => _isBold = value!);
+                            setState(() => _selectedFont = value!);
                           },
                         ),
-                        const Text('Bold'),
-                        const SizedBox(width: 16),
-                        Checkbox(
-                          value: _isItalic,
-                          onChanged: (value) {
-                            setState(() => _isItalic = value!);
-                          },
-                        ),
-                        const Text('Italic'),
-                      ],
-                    ),
+                      ),
 
-                    // Color picker
-                    Row(
-                      children: [
-                        const Text('Color: '),
-                        GestureDetector(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('Pick a color'),
-                                  content: SingleChildScrollView(
-                                    child: ColorPicker(
-                                      pickerColor: _selectedTextColor,
-                                      onColorChanged: (color) {
-                                        setState(
-                                          () => _selectedTextColor = color,
-                                        );
-                                      },
-                                    ),
+                      const SizedBox(height: 20),
+
+                      // Text size with visual indicator
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.format_size),
+                                const SizedBox(width: 8),
+                                const Text('Text Size'),
+                                const Spacer(),
+                                Text('${_textSize.round()}px'),
+                              ],
+                            ),
+                            Slider(
+                              value: _textSize,
+                              min: 12.0,
+                              max: 80.0,
+                              divisions: 68,
+                              activeColor: Colors.blue,
+                              onChanged: (value) {
+                                setState(() => _textSize = value);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Text styling options with better UI
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Text Style',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    title: const Text('Bold'),
+                                    value: _isBold,
+                                    onChanged: (value) {
+                                      setState(() => _isBold = value!);
+                                    },
+                                    contentPadding: EdgeInsets.zero,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
                                   ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('Done'),
-                                    ),
-                                  ],
+                                ),
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    title: const Text('Italic'),
+                                    value: _isItalic,
+                                    onChanged: (value) {
+                                      setState(() => _isItalic = value!);
+                                    },
+                                    contentPadding: EdgeInsets.zero,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Color picker with preset colors
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Text Color',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+
+                            // Quick color options
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                Colors.white,
+                                Colors.black,
+                                Colors.red,
+                                Colors.blue,
+                                Colors.green,
+                                Colors.yellow,
+                                Colors.purple,
+                                Colors.orange,
+                              ]
+                                  .map((color) => GestureDetector(
+                                        onTap: () {
+                                          setState(
+                                              () => _selectedTextColor = color);
+                                        },
+                                        child: Container(
+                                          width: 36,
+                                          height: 36,
+                                          decoration: BoxDecoration(
+                                            color: color,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: _selectedTextColor == color
+                                                  ? Colors.blue
+                                                  : Colors.grey,
+                                              width: _selectedTextColor == color
+                                                  ? 3
+                                                  : 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // Custom color picker button
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      title: const Text('Pick Custom Color'),
+                                      content: SingleChildScrollView(
+                                        child: ColorPicker(
+                                          pickerColor: _selectedTextColor,
+                                          onColorChanged: (color) {
+                                            setState(() =>
+                                                _selectedTextColor = color);
+                                          },
+                                          enableAlpha: false,
+                                          displayThumbColor: true,
+                                          showLabel: true,
+                                          paletteType: PaletteType.hsvWithHue,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: const Text('Done'),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: _selectedTextColor,
-                              border: Border.all(color: Colors.grey),
-                              borderRadius: BorderRadius.circular(8),
+                              icon: const Icon(Icons.palette),
+                              label: const Text('Custom Color'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _selectedTextColor,
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Text preview with better styling
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _textController.text.isEmpty
+                                ? 'Preview text will appear here'
+                                : _textController.text,
+                            style: GoogleFonts.getFont(
+                              availableFonts.contains(_selectedFont)
+                                  ? _selectedFont
+                                  : 'Roboto',
+                              fontSize: _textSize,
+                              color: _selectedTextColor,
+                              fontWeight:
+                                  _isBold ? FontWeight.bold : FontWeight.normal,
+                              fontStyle: _isItalic
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                              shadows: [
+                                Shadow(
+                                  offset: const Offset(1, 1),
+                                  blurRadius: 2,
+                                  color: Colors.black.withOpacity(0.7),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                      ],
-                    ),
-
-                    // Text preview
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        _textController.text.isEmpty
-                            ? 'Preview text'
-                            : _textController.text,
-                        style: GoogleFonts.getFont(
-                          availableFonts.contains(_selectedFont)
-                              ? _selectedFont
-                              : 'Roboto',
-                          fontSize: _textSize,
-                          color: _selectedTextColor,
-                          fontWeight:
-                              _isBold ? FontWeight.bold : FontWeight.normal,
-                          fontStyle:
-                              _isItalic ? FontStyle.italic : FontStyle.normal,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey),
                 ),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () {
                     if (_textController.text.isNotEmpty) {
                       _addTextToPreview();
                       Navigator.of(context).pop();
                     }
                   },
-                  child: const Text('Add Text'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Text'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ],
             );
@@ -791,7 +932,9 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     _textController.clear();
 
     showSnackBar(
-        context, 'Text added! You can now drag it around the preview.');
+      context,
+      'Text added! You can now drag it around the preview.',
+    );
   }
 
   void _showStickerPicker() {
@@ -799,43 +942,79 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Choose a Sticker'),
+          title: Row(
+            children: [
+              const Icon(Icons.emoji_emotions, color: Colors.orange),
+              const SizedBox(width: 8),
+              const Text('Choose Sticker'),
+            ],
+          ),
           content: SizedBox(
             width: double.maxFinite,
-            height: 400,
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 6,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: emojiStickers.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _addStickerToPreview(emojiStickers[index]);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        emojiStickers[index],
-                        style: const TextStyle(fontSize: 24),
-                      ),
+            height: 450,
+            child: Column(
+              children: [
+                // Search/filter bar (if needed)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Tap any sticker to add it to your media',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
                     ),
                   ),
-                );
-              },
+                ),
+
+                // Sticker grid with enhanced styling
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: emojiStickers.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _addStickerToPreview(emojiStickers[index]);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border:
+                                Border.all(color: Colors.grey.withOpacity(0.3)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                blurRadius: 2,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              emojiStickers[index],
+                              style: const TextStyle(fontSize: 28),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey),
             ),
           ],
         );
