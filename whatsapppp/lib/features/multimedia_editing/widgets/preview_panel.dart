@@ -241,8 +241,7 @@ class PreviewPanelState extends State<PreviewPanel> {
           });
           widget.onOverlaysChanged?.call(_overlayItems);
         },
-        onScaleEnd: (details) {
-        },
+        onScaleEnd: (details) {},
         child: Transform.rotate(
           angle: item.rotation,
           child: Transform.scale(
@@ -473,75 +472,6 @@ class PreviewPanelState extends State<PreviewPanel> {
       ),
     ];
   }
-
-  // List<Widget> _buildControlHandles(OverlayItem item) {
-  //   return [
-  //     // Rotation handle (top-right)
-  //     Positioned(
-  //       top: -10,
-  //       right: -10,
-  //       child: GestureDetector(
-  //         onPanUpdate: (details) {
-  //           // Calculate rotation based on pan movement
-  //           final center = Offset(50, 25); // Approximate center of text
-  //           final vector = details.localPosition - center;
-  //           final angle = vector.direction;
-
-  //           setState(() {
-  //             item.rotation = angle;
-  //           });
-  //           widget.onOverlaysChanged?.call(_overlayItems);
-  //         },
-  //         child: Container(
-  //           width: 20,
-  //           height: 20,
-  //           decoration: BoxDecoration(
-  //             color: Colors.blue,
-  //             shape: BoxShape.circle,
-  //             border: Border.all(color: Colors.white, width: 1),
-  //           ),
-  //           child: const Icon(
-  //             Icons.rotate_right,
-  //             size: 12,
-  //             color: Colors.white,
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-
-  //     // Scale handle (bottom-right)
-  //     Positioned(
-  //       bottom: -10,
-  //       right: -10,
-  //       child: GestureDetector(
-  //         onPanUpdate: (details) {
-  //           // Calculate scale based on distance from center
-  //           final distance = details.localPosition.distance;
-  //           final scaleFactor = (distance / 50).clamp(0.5, 3.0);
-
-  //           setState(() {
-  //             item.scale = scaleFactor;
-  //           });
-  //           widget.onOverlaysChanged?.call(_overlayItems);
-  //         },
-  //         child: Container(
-  //           width: 20,
-  //           height: 20,
-  //           decoration: BoxDecoration(
-  //             color: Colors.green,
-  //             shape: BoxShape.circle,
-  //             border: Border.all(color: Colors.white, width: 1),
-  //           ),
-  //           child: const Icon(
-  //             Icons.open_in_full,
-  //             size: 12,
-  //             color: Colors.white,
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   ];
-  // }
 
   Widget _buildOverlayContent(OverlayItem item, {bool isDragging = false}) {
     Widget content;
