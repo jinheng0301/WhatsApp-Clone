@@ -9,7 +9,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 class AudioService {
   static final AudioPlayer _audioPlayer = AudioPlayer();
-  static final AudioRecorder _recorder = AudioRecorder();
 
   // Add background music to video
   static Future<String?> addBackgroundMusicToVideo({
