@@ -89,23 +89,6 @@ class ImageHandler {
     );
   }
 
-  Future<void> applyFilter(
-    BuildContext context,
-    String imagePath,
-    String filterType,
-    Function(String newPath) onFilterApplied,
-  ) async {
-    if (filterType == 'original') return;
-
-    final newPath = await MediaEditorService.applyFilter(
-      mediaPath: imagePath,
-      filterType: filterType,
-      isVideo: false,
-    );
-    onFilterApplied(newPath);
-    showSnackBar(context, 'Filter "$filterType" applied successfully!');
-  }
-
   Future<void> showFilterDialog(
     BuildContext context,
     String imagePath,
@@ -265,46 +248,49 @@ class ImageHandler {
     );
   }
 
-  Future<void> applyEffect(
-    BuildContext context,
-    String imagePath,
-    String effectType,
-    Function(String newPath) onEffectApplied,
-  ) async {
-    // For now, we'll use the filter system to apply basic effects
-    // In a real implementation, you'd have specific effect methods
-    String filterType = effectType;
-
-    final newPath = await MediaEditorService.applyFilter(
-      mediaPath: imagePath,
-      filterType: filterType,
-      isVideo: false,
-    );
-    onEffectApplied(newPath);
-    showSnackBar(context, 'Effect "$effectType" applied successfully!');
-  }
-
   Future<void> duplicateImage(
     BuildContext context,
     String imagePath,
     Function(String newPath) onImageDuplicated,
   ) async {
     try {
-      final directory = Directory(imagePath).parent;
-      final fileName = imagePath.split('/').last;
-      final extension = fileName.split('.').last;
+      // Check if the original file exists
+      final originalFile = File(imagePath);
+      if (!await originalFile.exists()) {
+        showSnackBar(context, 'Original image file not found');
+        return;
+      }
+
+      // Get file info
+      final directory = originalFile.parent;
+      final fileName = originalFile.path.split('/').last;
+      final extension = fileName.split('.').last.toLowerCase();
       final nameWithoutExtension = fileName.replaceAll('.$extension', '');
 
-      final outputPath =
-          '${directory.path}/${nameWithoutExtension}_copy.$extension';
+      // Generate unique filename
+      String outputPath;
+      int counter = 1;
+      do {
+        outputPath =
+            '${directory.path}/${nameWithoutExtension}_copy_$counter.$extension';
+        counter++;
+      } while (await File(outputPath).exists());
 
       // Copy the file
-      await File(imagePath).copy(outputPath);
+      await originalFile.copy(outputPath);
 
-      onImageDuplicated(outputPath);
-      showSnackBar(context, 'Image duplicated successfully!');
+      // Verify the copy was created successfully
+      final copiedFile = File(outputPath);
+      if (await copiedFile.exists()) {
+        onImageDuplicated(outputPath);
+        showSnackBar(context,
+            'Image duplicated successfully!\nSaved as: ${outputPath.split('/').last}');
+      } else {
+        showSnackBar(context, 'Failed to create duplicate image');
+      }
     } catch (e) {
       showSnackBar(context, 'Error duplicating image: $e');
+      print('Duplicate image error: $e'); // For debugging
     }
   }
 
@@ -349,6 +335,48 @@ class ImageHandler {
       );
     } catch (e) {
       showSnackBar(context, 'Error getting image info: $e');
+    }
+  }
+
+  Future<void> applyFilter(
+    BuildContext context,
+    String imagePath,
+    String? filter,
+    Function(String newPath) onFilterApplied,
+  ) async {
+    if (filter == null || filter == 'original') return;
+
+    try {
+      final newPath = await MediaEditorService.applyFilter(
+        mediaPath: imagePath,
+        filterType: filter,
+        isVideo: false,
+      );
+
+      onFilterApplied(newPath);
+      showSnackBar(context, 'Filter "$filter" applied to image');
+    } catch (e) {
+      showSnackBar(context, 'Error applying filter: $e');
+    }
+  }
+
+  Future<void> applyEffect(
+    BuildContext context,
+    String imagePath,
+    String effect,
+    Function(String newPath) onEffectApplied,
+  ) async {
+    try {
+      final newPath = await MediaEditorService.applyEffect(
+        mediaPath: imagePath,
+        effectType: effect.toLowerCase(),
+        isVideo: false,
+      );
+
+      onEffectApplied(newPath);
+      showSnackBar(context, 'Effect "$effect" applied to image');
+    } catch (e) {
+      showSnackBar(context, 'Error applying effect: $e');
     }
   }
 }

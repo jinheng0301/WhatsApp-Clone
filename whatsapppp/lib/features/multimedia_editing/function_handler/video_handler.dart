@@ -264,14 +264,65 @@ class VideoHandler {
     Function(String newPath) onVideoDuplicated,
   ) async {
     try {
-      final outputPath = '${videoPath}_duplicate.mp4';
-      final command = '-i "$videoPath" -c copy "$outputPath"';
-      await FFmpegKit.execute(command);
+      // Check if the original file exists
+      final originalFile = File(videoPath);
+      if (!await originalFile.exists()) {
+        showSnackBar(context, 'Original video file not found');
+        return;
+      }
 
-      onVideoDuplicated(outputPath);
-      showSnackBar(context, 'Video duplicated successfully!');
+      // Get file info
+      final directory = originalFile.parent;
+      final fileName = originalFile.path.split('/').last;
+      final extension = fileName.split('.').last.toLowerCase();
+      final nameWithoutExtension = fileName.replaceAll('.$extension', '');
+
+      // Generate unique filename
+      String outputPath;
+      int counter = 1;
+      do {
+        outputPath =
+            '${directory.path}/${nameWithoutExtension}_copy_$counter.$extension';
+        counter++;
+      } while (await File(outputPath).exists());
+
+      // Show progress dialog for large video files
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Duplicating video...'),
+            ],
+          ),
+        ),
+      );
+
+      // Copy the file
+      await originalFile.copy(outputPath);
+
+      // Close progress dialog
+      Navigator.of(context).pop();
+
+      // Verify the copy was created successfully
+      final copiedFile = File(outputPath);
+      if (await copiedFile.exists()) {
+        onVideoDuplicated(outputPath);
+        showSnackBar(context,
+            'Video duplicated successfully!\nSaved as: ${outputPath.split('/').last}');
+      } else {
+        showSnackBar(context, 'Failed to create duplicate video');
+      }
     } catch (e) {
+      // Close progress dialog if it's open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       showSnackBar(context, 'Error duplicating video: $e');
+      print('Duplicate video error: $e'); // For debugging
     }
   }
 

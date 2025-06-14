@@ -331,7 +331,11 @@ class AudioHandler {
       if (recordedPath != null) {
         _recordedVoiceOverPath = recordedPath;
         await _showVoiceOverConfigDialog(
-            context, recordedPath, currentMediaPath, onMediaPathChanged);
+          context,
+          recordedPath,
+          currentMediaPath,
+          onMediaPathChanged,
+        );
       }
     } catch (e) {
       if (context.mounted) {

@@ -126,20 +126,22 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           IconButton(icon: const Icon(Icons.share), onPressed: _shareProject),
         ],
       ),
-      body: Column(children: [
-        Expanded(
-          flex: 3,
-          child: PreviewPanel(
-            key: _previewPanelKey,
-            mediaPath: widget.mediaPath,
-            isVideo: widget.isVideo,
-            onOverlaysChanged: (overlays) => _currentOverlays = overlays,
+      body: Column(
+        children: [
+          Expanded(
+            flex: 3,
+            child: PreviewPanel(
+              key: _previewPanelKey,
+              mediaPath: widget.mediaPath,
+              isVideo: widget.isVideo,
+              onOverlaysChanged: (overlays) => _currentOverlays = overlays,
+            ),
           ),
-        ),
-        if (widget.isVideo) const Expanded(flex: 2, child: TimelineEditor()),
-        _buildTabBar(),
-        Expanded(flex: 2, child: _buildToolOptions()),
-      ]),
+          if (widget.isVideo) const Expanded(flex: 2, child: TimelineEditor()),
+          _buildTabBar(),
+          Expanded(flex: 2, child: _buildToolOptions()),
+        ],
+      ),
     );
   }
 
@@ -157,18 +159,20 @@ class _EditScreenState extends ConsumerState<EditScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               border: Border(
-                  bottom: BorderSide(
-                width: 3,
-                color: _selectedTabIndex == index
-                    ? Colors.blue
-                    : Colors.transparent,
-              )),
+                bottom: BorderSide(
+                  width: 3,
+                  color: _selectedTabIndex == index
+                      ? Colors.blue
+                      : Colors.transparent,
+                ),
+              ),
             ),
-            child: Text(_toolTabs[index],
-                style: TextStyle(
-                  color:
-                      _selectedTabIndex == index ? Colors.blue : Colors.white,
-                )),
+            child: Text(
+              _toolTabs[index],
+              style: TextStyle(
+                color: _selectedTabIndex == index ? Colors.blue : Colors.white,
+              ),
+            ),
           ),
         ),
       ),
@@ -408,6 +412,102 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     );
   }
 
+  Widget _buildEffectTools() {
+    final effects = [
+      ('Blur', Icons.blur_on),
+      ('Brighten', Icons.brightness_high),
+      ('Darken', Icons.filter_hdr),
+      ('Contrast', Icons.view_in_ar),
+    ];
+
+    return GridView.count(
+      crossAxisCount: 3,
+      children:
+          effects.map((effect) => _effectButton(effect.$1, effect.$2)).toList(),
+    );
+  }
+
+  Widget _buildFilterTools() {
+    final filters = [
+      ('Original', null, Colors.transparent),
+      ('Vintage', 'vintage', Colors.orange.withOpacity(0.3)),
+      ('B&W', 'grayscale', Colors.grey),
+      ('Sepia', 'sepia', Colors.brown.withOpacity(0.3)),
+      ('Vibrant', 'vibrant', Colors.purple.withOpacity(0.3)),
+      ('Cool', 'cool', Colors.blue.withOpacity(0.3)),
+    ];
+
+    return GridView.count(
+      crossAxisCount: 3,
+      children: filters
+          .map((filter) => _filterButton(filter.$1, filter.$2, filter.$3))
+          .toList(),
+    );
+  }
+
+  Widget _toolButton(IconData icon, String label,
+      {required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 30),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 12))
+        ],
+      ),
+    );
+  }
+
+  Widget _filterButton(String name, String? filter, Color color) {
+    return InkWell(
+      onTap: () => _applyFilter(filter),
+      child: Container(
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _effectButton(String name, IconData icon) {
+    return InkWell(
+      onTap: () => _applyEffect(name.toLowerCase()),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 30),
+          const SizedBox(height: 4),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 12),
+          )
+        ],
+      ),
+    );
+  }
+
   void _showTextEditor() {
     _textHandler.showTextEditor(
       context,
@@ -506,6 +606,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         showSnackBar(context, 'Filter "$filter" applied to video');
       });
     } else {
+      // Use ImageHandler method instead of inline logic
       _imageHandler.applyFilter(
         context,
         widget.mediaPath,
@@ -517,17 +618,18 @@ class _EditScreenState extends ConsumerState<EditScreen> {
 
   void _applyEffect(String effect) {
     if (widget.isVideo) {
-      // For video effects, use MediaEditorService
-      MediaEditorService.applyFilter(
+      MediaEditorService.applyEffect(
         mediaPath: widget.mediaPath,
-        filterType: effect,
+        effectType: effect,
         isVideo: true,
       ).then((newPath) {
         setState(() => widget.mediaPath = newPath);
         showSnackBar(context, 'Effect "$effect" applied to video');
+      }).catchError((error) {
+        showSnackBar(context, 'Error applying effect: $error');
       });
     } else {
-      // For image effects, use ImageHandler
+      // Use ImageHandler method for images
       _imageHandler.applyEffect(
         context,
         widget.mediaPath,
@@ -609,6 +711,9 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       widget.mediaPath,
       (newPath) {
         // Optionally switch to duplicated file or show info
+        setState(() {
+          widget.mediaPath = newPath;
+        });
         showSnackBar(context, 'Video duplicated successfully');
       },
     );
@@ -621,6 +726,9 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       context,
       widget.mediaPath,
       (newPath) {
+        setState(() {
+          widget.mediaPath = newPath;
+        });
         showSnackBar(context, 'Image duplicated successfully');
       },
     );
@@ -687,102 +795,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       context,
       widget.mediaPath,
       (newPath) => setState(() => widget.mediaPath = newPath),
-    );
-  }
-
-  Widget _buildEffectTools() {
-    final effects = [
-      ('Blur', Icons.blur_on),
-      ('Glow', Icons.brightness_high),
-      ('Shadow', Icons.filter_hdr),
-      ('3D', Icons.view_in_ar),
-    ];
-
-    return GridView.count(
-      crossAxisCount: 3,
-      children:
-          effects.map((effect) => _effectButton(effect.$1, effect.$2)).toList(),
-    );
-  }
-
-  Widget _buildFilterTools() {
-    final filters = [
-      ('Original', null, Colors.transparent),
-      ('Vintage', 'vintage', Colors.orange.withOpacity(0.3)),
-      ('B&W', 'grayscale', Colors.grey),
-      ('Sepia', 'sepia', Colors.brown.withOpacity(0.3)),
-      ('Vibrant', 'vibrant', Colors.purple.withOpacity(0.3)),
-      ('Cool', 'cool', Colors.blue.withOpacity(0.3)),
-    ];
-
-    return GridView.count(
-      crossAxisCount: 3,
-      children: filters
-          .map((filter) => _filterButton(filter.$1, filter.$2, filter.$3))
-          .toList(),
-    );
-  }
-
-  Widget _toolButton(IconData icon, String label,
-      {required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 30),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12))
-        ],
-      ),
-    );
-  }
-
-  Widget _filterButton(String name, String? filter, Color color) {
-    return InkWell(
-      onTap: () => _applyFilter(filter),
-      child: Container(
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: const TextStyle(fontSize: 10),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _effectButton(String name, IconData icon) {
-    return InkWell(
-      onTap: () => _applyEffect(name.toLowerCase()),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 30),
-          const SizedBox(height: 4),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 12),
-          )
-        ],
-      ),
     );
   }
 

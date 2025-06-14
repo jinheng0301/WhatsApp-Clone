@@ -77,8 +77,8 @@ class AudioService {
   // Adjust original audio volume
   static Future<String?> adjustOriginalAudioVolume({
     required String videoPath,
-    required double
-        volumeLevel, // 0.0 to 2.0 (0 = mute, 1 = original, 2 = double)
+    required double volumeLevel,
+    // 0.0 to 2.0 (0 = mute, 1 = original, 2 = double)
   }) async {
     try {
       final outputPath = '${videoPath}_volume_adjusted.mp4';

@@ -34,6 +34,50 @@ class MediaEditorService {
     return outputPath;
   }
 
+  static Future<String> applyEffect({
+    required String mediaPath,
+    required String effectType,
+    required bool isVideo,
+  }) async {
+    final outputPath =
+        '${mediaPath}_${effectType}_effect.${isVideo ? 'mp4' : 'jpg'}';
+
+    if (isVideo) {
+      await _applyVideoEffect(mediaPath, effectType, outputPath);
+    } else {
+      await _applyImageEffect(mediaPath, effectType, outputPath);
+    }
+
+    return outputPath;
+  }
+
+  static Future<void> _applyVideoEffect(
+    String inputPath,
+    String effectType,
+    String outputPath,
+  ) async {
+    String command;
+
+    switch (effectType) {
+      case 'blur':
+        command = '-i $inputPath -vf "boxblur=5:1" $outputPath';
+        break;
+      case 'brighten':
+        command = '-i $inputPath -vf "eq=brightness=0.3" $outputPath';
+        break;
+      case 'darken':
+        command = '-i $inputPath -vf "eq=brightness=-0.3" $outputPath';
+        break;
+      case 'contrast':
+        command = '-i $inputPath -vf "eq=contrast=1.5" $outputPath';
+        break;
+      default:
+        return;
+    }
+
+    await FFmpegKit.execute(command);
+  }
+
   static Future<void> _applyVideoFilter(
     String inputPath,
     String filterType,
@@ -64,6 +108,39 @@ class MediaEditorService {
     }
 
     await FFmpegKit.execute(command);
+  }
+
+  static Future<void> _applyImageEffect(
+    String inputPath,
+    String effectType,
+    String outputPath,
+  ) async {
+    final bytes = await File(inputPath).readAsBytes();
+    img.Image? image = img.decodeImage(bytes);
+    if (image == null) return;
+
+    switch (effectType) {
+      case 'blur':
+        // Apply Gaussian blur
+        image = img.gaussianBlur(image, radius: 3);
+        break;
+      case 'brighten':
+        // Increase brightness
+        image = img.adjustColor(image, brightness: 1.3);
+        break;
+      case 'darken':
+        // Decrease brightness
+        image = img.adjustColor(image, brightness: 0.7);
+        break;
+      case 'contrast':
+        // Increase contrast
+        image = img.adjustColor(image, contrast: 1.5);
+        break;
+      default:
+        return;
+    }
+
+    await File(outputPath).writeAsBytes(img.encodeJpg(image));
   }
 
   static Future<void> _applyImageFilter(
