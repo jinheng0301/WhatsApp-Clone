@@ -122,7 +122,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       appBar: AppBar(
         title: Text(widget.isVideo ? 'Video Editor' : 'Photo Editor'),
         actions: [
-          IconButton(icon: const Icon(Icons.save), onPressed: _exportProject),
+          IconButton(
+              icon: const Icon(Icons.import_export), onPressed: _exportProject),
           IconButton(icon: const Icon(Icons.share), onPressed: _shareProject),
         ],
       ),
@@ -142,6 +143,21 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           Expanded(flex: 2, child: _buildToolOptions()),
         ],
       ),
+      floatingActionButton: _buildSaveButton(),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return FloatingActionButton(
+      onPressed: () async {
+        if (!widget.isVideo) {
+          await _saveEditedImageToCloud();
+        } else {
+          _exportProject();
+        }
+      },
+      tooltip: widget.isVideo ? 'Export Video' : 'Save Image',
+      child: Icon(widget.isVideo ? Icons.video_call : Icons.save),
     );
   }
 
@@ -252,8 +268,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                     children: [
                       Icon(Icons.music_note, color: Colors.blue),
                       SizedBox(width: 8),
-                      Text('Background Music',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Background Music',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -799,19 +819,114 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   }
 
   void _exportProject() async {
-    final overlays = _previewPanelKey.currentState?.overlayItems ?? [];
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Export Project'),
-        content: Text('Ready to export with ${overlays.length} overlay items'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          )
-        ],
-      ),
-    );
+    try {
+      final overlays = _previewPanelKey.currentState?.overlayItems ?? [];
+
+      if (!widget.isVideo) {
+        // For images, always use the new save method
+        final shouldSave = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Export Image'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    'Ready to export image with ${overlays.length} overlay items'),
+                const SizedBox(height: 16),
+                const Text('Choose export option:'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save to Cloud'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldSave == true) {
+          await _saveEditedImageToCloud();
+        }
+      } else {
+        // Original video export logic
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Export Project'),
+            content:
+                Text('Ready to export with ${overlays.length} overlay items'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              )
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      showSnackBar(context, 'Error exporting project: $e');
+    }
+  }
+
+  Future<void> _saveEditedImageToCloud() async {
+    try {
+      final overlays = _previewPanelKey.currentState?.overlayItems ?? [];
+
+      // Use the updated method that handles overlays and blob storage
+      final blobId = await _media.saveCurrentEditedImage(
+        context: context,
+        projectId: widget.mediaPath.hashCode.toString(),
+        originalImagePath: widget.mediaPath, // Pass the original path
+        overlays: overlays, // Pass the overlays
+      );
+
+      if (blobId != null) {
+        // Show success dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Image Saved Successfully'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Your edited image with ${overlays.length} overlays has been saved as blob.',
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Blob ID: $blobId',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _shareProject();
+                },
+                child: const Text('Share'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      showSnackBar(context, 'Failed to save image: $e');
+    }
   }
 }

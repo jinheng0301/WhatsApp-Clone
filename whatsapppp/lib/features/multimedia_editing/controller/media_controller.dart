@@ -1,9 +1,12 @@
 import 'dart:io';
-
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:whatsapppp/common/repositories/common_blob_storage_repository.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
+import 'package:whatsapppp/features/multimedia_editing/widgets/preview_panel.dart';
 
 // State providers for media editing
 final isEditingProvider = StateProvider<bool>((ref) => false);
@@ -14,8 +17,10 @@ final selectedFilterProvider = StateProvider<String?>((ref) => null);
 // Controller provider
 final mediaControllerProvider = Provider((ref) {
   final mediaRepository = ref.watch(mediaRepositoryProvider);
+  final blobRepository = ref.watch(commonBlobStorageRepositoryProvider);
   return MediaController(
     mediaRepository: mediaRepository,
+    blobRepository: blobRepository,
     ref: ref,
   );
 });
@@ -29,10 +34,12 @@ final userEditingHistoryProvider =
 
 class MediaController {
   final MediaRepository mediaRepository;
+  final CommonBlobStorageRepository blobRepository;
   final Ref ref;
 
   MediaController({
     required this.mediaRepository,
+    required this.blobRepository,
     required this.ref,
   });
 
@@ -228,26 +235,311 @@ class MediaController {
     }
   }
 
-  // Save and sharing methods
-  Future<String?> saveEditedMediaToCloud({
-    required File mediaFile,
-    required String mediaType,
+  // NEW: Save image as blob instead of Firebase Storage
+  Future<String?> saveEditedImageToBlob({
+    required File imageFile,
     required BuildContext context,
+    String? originalFileName,
+    String? projectId,
   }) async {
     try {
       ref.read(isEditingProvider.notifier).state = true;
       ref.read(editingProgressProvider.notifier).state = 0.1;
 
-      final downloadUrl = await mediaRepository.saveEditedMedia(
-        mediaFile: mediaFile,
-        mediaType: mediaType,
-        ref: ref,
+      // Generate a path for the blob storage
+      final userId = 'user_id'; // You'll need to get this from your auth system
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = originalFileName ?? 'edited_image_$timestamp.jpg';
+      final blobPath = 'media/$userId/edited_images/$fileName';
+
+      ref.read(editingProgressProvider.notifier).state = 0.5;
+
+      // Store the image file as a blob
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        imageFile,
+        context,
       );
 
       ref.read(editingProgressProvider.notifier).state = 1.0;
 
-      showSnackBar(context, 'Media saved to cloud successfully');
-      return downloadUrl;
+      showSnackBar(context, 'Image saved as blob successfully');
+      return blobId; // Return the blob ID instead of download URL
+    } catch (e) {
+      print('Failed to save image as blob: ${e.toString()}');
+      showSnackBar(context, 'Failed to save image: ${e.toString()}');
+      return null;
+    } finally {
+      ref.read(isEditingProvider.notifier).state = false;
+      ref.read(editingProgressProvider.notifier).state = 0.0;
+    }
+  }
+
+  // UPDATED: Save image with overlays rendered
+  Future<String?> saveImageWithOverlays({
+    required String originalImagePath,
+    required List<OverlayItem> overlays,
+    required BuildContext context,
+    String? projectId,
+  }) async {
+    try {
+      ref.read(isEditingProvider.notifier).state = true;
+      ref.read(editingProgressProvider.notifier).state = 0.1;
+
+      print('MediaController: Saving image with ${overlays.length} overlays');
+
+      // If there are overlays, we need to render them onto the image
+      File imageToSave;
+
+      if (overlays.isNotEmpty) {
+        print('MediaController: Rendering overlays onto image');
+        ref.read(editingProgressProvider.notifier).state = 0.3;
+
+        // Create a new image with overlays rendered
+        imageToSave = await _renderOverlaysOnImage(
+          originalImagePath: originalImagePath,
+          overlays: overlays,
+        );
+      } else {
+        // No overlays, use current edited image or original
+        final currentFile = ref.read(currentMediaFileProvider);
+        imageToSave = currentFile ?? File(originalImagePath);
+      }
+
+      ref.read(editingProgressProvider.notifier).state = 0.6;
+
+      // Save using blob storage instead of Firebase Storage
+      final blobId = await saveEditedImageToBlob(
+        imageFile: imageToSave,
+        context: context,
+        originalFileName: 'edited_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        projectId: projectId,
+      );
+
+      ref.read(editingProgressProvider.notifier).state = 1.0;
+      ref.read(currentMediaFileProvider.notifier).state = imageToSave;
+
+      if (blobId != null) {
+        showSnackBar(context, 'Image with overlays saved successfully');
+      }
+
+      return blobId;
+    } catch (e) {
+      showSnackBar(
+          context, 'Failed to save image with overlays: ${e.toString()}');
+      return null;
+    } finally {
+      ref.read(isEditingProvider.notifier).state = false;
+      ref.read(editingProgressProvider.notifier).state = 0.0;
+    }
+  }
+
+  // IMPROVED: Render overlays on image using Flutter's painting system
+  Future<File> _renderOverlaysOnImage({
+    required String originalImagePath,
+    required List<OverlayItem> overlays,
+  }) async {
+    try {
+      print('MediaController: Starting overlay rendering');
+
+      // Load the original image
+      final originalFile = File(originalImagePath);
+      final imageBytes = await originalFile.readAsBytes();
+      final originalImage = await decodeImageFromList(imageBytes);
+
+      print(
+          'MediaController: Original image size: ${originalImage.width}x${originalImage.height}');
+
+      // Create a picture recorder and canvas
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // Draw the original image
+      canvas.drawImage(originalImage, Offset.zero, Paint());
+
+      // Draw each overlay
+      for (int i = 0; i < overlays.length; i++) {
+        final overlay = overlays[i];
+        print('MediaController: Rendering overlay $i: ${overlay.type}');
+
+        await _drawOverlayOnCanvas(canvas, overlay,
+            originalImage.width.toDouble(), originalImage.height.toDouble());
+      }
+
+      // Convert to image
+      final picture = recorder.endRecording();
+      final img =
+          await picture.toImage(originalImage.width, originalImage.height);
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        throw Exception('Failed to convert image to bytes');
+      }
+
+      // Save to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final tempFile = File('${tempDir.path}/edited_image_$timestamp.png');
+      await tempFile.writeAsBytes(byteData.buffer.asUint8List());
+
+      print(
+          'MediaController: Overlay rendering completed, saved to: ${tempFile.path}');
+
+      // Clean up
+      originalImage.dispose();
+      img.dispose();
+
+      return tempFile;
+    } catch (e) {
+      print('MediaController: Error rendering overlays: $e');
+      // If rendering fails, return the original file
+      return File(originalImagePath);
+    }
+  }
+
+  // Helper method to draw individual overlays on canvas
+  Future<void> _drawOverlayOnCanvas(Canvas canvas, OverlayItem overlay,
+      double imageWidth, double imageHeight) async {
+    canvas.save();
+
+    // Apply transformations
+    canvas.translate(overlay.position.dx, overlay.position.dy);
+    canvas.rotate(overlay.rotation);
+    canvas.scale(overlay.scale);
+
+    if (overlay.type == OverlayType.text) {
+      // Draw text overlay
+      final textStyle = TextStyle(
+        fontSize: overlay.fontSize,
+        color: overlay.color,
+        fontWeight: (overlay.isBold) ? FontWeight.bold : FontWeight.normal,
+        fontStyle: (overlay.isItalic) ? FontStyle.italic : FontStyle.normal,
+        shadows: [
+          Shadow(
+            offset: const Offset(1, 1),
+            blurRadius: 2,
+            color: Colors.black.withOpacity(0.5),
+          ),
+        ],
+      );
+
+      final textSpan = TextSpan(text: overlay.content, style: textStyle);
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+
+      textPainter.layout();
+      textPainter.paint(canvas, Offset.zero);
+    } else if (overlay.type == OverlayType.sticker) {
+      // Draw sticker overlay
+      // You'll need to implement sticker loading and drawing
+      // For now, draw a placeholder
+      final paint = Paint()
+        ..color = overlay.color
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset.zero, 20, paint);
+
+      // Add text for sticker content
+      if (overlay.content.isNotEmpty) {
+        final textStyle = TextStyle(
+          fontSize: 16,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        );
+
+        final textSpan = TextSpan(text: overlay.content, style: textStyle);
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: TextDirection.ltr,
+          textAlign: TextAlign.center,
+        );
+
+        textPainter.layout();
+        textPainter.paint(
+            canvas, Offset(-textPainter.width / 2, -textPainter.height / 2));
+      }
+    }
+
+    canvas.restore();
+  }
+
+  // UPDATED: Save current edited image using blob storage
+  Future<String?> saveCurrentEditedImage({
+    required BuildContext context,
+    String? projectId,
+    String? originalImagePath,
+    List<OverlayItem>? overlays,
+  }) async {
+    final currentFile = ref.read(currentMediaFileProvider);
+
+    // Check if we have overlays but no current file
+    if (currentFile == null) {
+      if (originalImagePath != null && (overlays?.isNotEmpty ?? false)) {
+        // We have overlays on the original image
+        showSnackBar(
+            context, 'Saving original image with ${overlays!.length} overlays');
+
+        return await saveImageWithOverlays(
+          originalImagePath: originalImagePath,
+          overlays: overlays,
+          context: context,
+          projectId: projectId,
+        );
+      } else if (originalImagePath != null) {
+        // No overlays, save original image as blob
+        return await saveEditedImageToBlob(
+          imageFile: File(originalImagePath),
+          context: context,
+          originalFileName: originalImagePath.split('/').last,
+          projectId: projectId,
+        );
+      } else {
+        showSnackBar(context, 'No image to save');
+        return null;
+      }
+    }
+
+    // Save the current edited file
+    return await saveEditedImageToBlob(
+      imageFile: currentFile,
+      context: context,
+      originalFileName: currentFile.path.split('/').last,
+      projectId: projectId,
+    );
+  }
+
+  // Save and sharing methods for other media types
+  Future<String?> saveEditedMediaToBlob({
+    required File mediaFile,
+    required String mediaType,
+    required BuildContext context,
+    String? originalFileName,
+    String? projectId,
+  }) async {
+    try {
+      ref.read(isEditingProvider.notifier).state = true;
+      ref.read(editingProgressProvider.notifier).state = 0.1;
+
+      // Generate a path for the blob storage
+      const userId = 'user_id'; // You'll need to get this from your auth system
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = originalFileName ?? 'edited_media_$timestamp';
+      final blobPath = 'media/$userId/edited_$mediaType/$fileName';
+
+      ref.read(editingProgressProvider.notifier).state = 0.5;
+
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        mediaFile,
+        context,
+      );
+
+      ref.read(editingProgressProvider.notifier).state = 1.0;
+
+      showSnackBar(context, 'Media saved as blob successfully');
+      return blobId;
     } catch (e) {
       showSnackBar(context, 'Failed to save media: ${e.toString()}');
       return null;

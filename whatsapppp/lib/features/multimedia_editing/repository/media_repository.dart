@@ -7,22 +7,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
-import 'package:whatsapppp/common/repositories/common_firebase_storage_repository.dart';
+import 'package:whatsapppp/common/repositories/common_blob_storage_repository.dart';
 
 final mediaRepositoryProvider = Provider(
   (ref) => MediaRepository(
     auth: FirebaseAuth.instance,
     firestore: FirebaseFirestore.instance,
+    blobRepository: ref.watch(commonBlobStorageRepositoryProvider),
   ),
 );
 
 class MediaRepository {
   final FirebaseAuth auth;
   final FirebaseFirestore firestore;
+  final CommonBlobStorageRepository blobRepository;
 
   MediaRepository({
     required this.auth,
     required this.firestore,
+    required this.blobRepository,
   });
 
   // Image editing methods
@@ -241,25 +244,115 @@ class MediaRepository {
     }
   }
 
-  // Save edited media to Firebase Storage
+  // UPDATED: Save edited media using blob storage instead of Firebase Storage
   Future<String> saveEditedMedia({
     required File mediaFile,
     required String mediaType,
-    required Ref ref,
+    required BuildContext context,
+    String? originalFileName,
+    String? projectId,
   }) async {
     try {
-      final String fileName =
-          '${mediaType}_${DateTime.now().millisecondsSinceEpoch}';
-      final String storagePath =
-          'edited_media/${auth.currentUser!.uid}/$fileName';
+      // Generate a path for the blob storage
+      final userId = auth.currentUser?.uid ?? 'anonymous';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = originalFileName ?? 'edited_${mediaType}_$timestamp';
+      final blobPath = 'media/$userId/edited_$mediaType/$fileName';
 
-      final String downloadUrl = await ref
-          .read(CommonFirebaseStorageRepositoryProvider)
-          .storeFileToFirebase(storagePath, mediaFile);
+      // Store the file as a blob
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        mediaFile,
+        context,
+      );
 
-      return downloadUrl;
+      // Save metadata to Firestore
+      await _saveMediaMetadataToFirestore(
+        userId: userId,
+        fileName: fileName,
+        blobId: blobId,
+        originalFileName: originalFileName ?? fileName,
+        mediaType: mediaType,
+        projectId: projectId,
+        blobPath: blobPath,
+      );
+
+      return blobId;
     } catch (e) {
       throw Exception('Failed to save media: $e');
+    }
+  }
+
+  // NEW: Save edited image using blob storage
+  Future<String> saveEditedImageToBlob({
+    required File editedImageFile,
+    required String originalFileName,
+    required BuildContext context,
+    String? projectId,
+  }) async {
+    try {
+      final userId = auth.currentUser?.uid ?? 'anonymous';
+      final timestamp = DateTime.now().toString();
+      final fileName = projectId != null
+          ? 'project_${projectId}_${timestamp}.jpg'
+          : 'edited_${originalFileName}_${timestamp}.jpg';
+
+      final blobPath = 'media/$userId/edited_images/$fileName';
+
+      // Store the image file as a blob
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        editedImageFile,
+        context,
+      );
+
+      // Save metadata to Firestore
+      await _saveMediaMetadataToFirestore(
+        userId: userId,
+        fileName: fileName,
+        blobId: blobId,
+        originalFileName: originalFileName,
+        mediaType: 'image',
+        projectId: projectId,
+        blobPath: blobPath,
+      );
+
+      return blobId;
+    } catch (e) {
+      throw Exception('Failed to save edited image as blob: $e');
+    }
+  }
+
+  // UPDATED: Save metadata to Firestore with blob reference
+  Future<void> _saveMediaMetadataToFirestore({
+    required String userId,
+    required String fileName,
+    required String blobId,
+    required String originalFileName,
+    required String mediaType,
+    String? projectId,
+    required String blobPath,
+  }) async {
+    try {
+      final docData = {
+        'userId': userId,
+        'fileName': fileName,
+        'originalFileName': originalFileName,
+        'blobId': blobId, // Store blob ID instead of download URL
+        'blobPath': blobPath,
+        'mediaType': mediaType,
+        'storageType': 'blob', // Indicate this is blob storage
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (projectId != null) {
+        docData['projectId'] = projectId;
+      }
+
+      await firestore.collection('edited_media').add(docData);
+    } catch (e) {
+      throw Exception('Failed to save media metadata: $e');
     }
   }
 
@@ -314,5 +407,72 @@ class MediaRepository {
                   ...doc.data(),
                 })
             .toList());
+  }
+
+  // NEW: Get media by blob ID
+  Future<File?> getMediaFileFromBlob({
+    required String blobId,
+    required String userId,
+    String? fileName,
+  }) async {
+    try {
+      final blobData = await blobRepository.getBlob(blobId, userId);
+
+      if (blobData == null) {
+        return null;
+      }
+
+      // Save blob data to temporary file
+      final directory = await getTemporaryDirectory();
+      final tempFileName =
+          fileName ?? 'blob_file_${DateTime.now().millisecondsSinceEpoch}';
+      final tempFile = File('${directory.path}/$tempFileName');
+
+      await tempFile.writeAsBytes(blobData);
+
+      return tempFile;
+    } catch (e) {
+      print('Failed to get media file from blob: $e');
+      return null;
+    }
+  }
+
+  // NEW: Get user's media files from blob storage
+  Stream<List<Map<String, dynamic>>> getUserMediaFiles() {
+    return firestore
+        .collection('edited_media')
+        .where('userId', isEqualTo: auth.currentUser!.uid)
+        .where('storageType', isEqualTo: 'blob')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  ...doc.data(),
+                })
+            .toList());
+  }
+
+  // NEW: Delete media file and its blob
+  Future<bool> deleteMediaFile(
+      String documentId, String blobId, String userId) async {
+    try {
+      // Delete from Firestore
+      await firestore.collection('edited_media').doc(documentId).delete();
+
+      // Delete blob data
+      await firestore
+          .collection('users')
+          .doc(userId)
+          .collection('media')
+          .doc(blobId)
+          .delete();
+
+      return true;
+    } catch (e) {
+      print('Failed to delete media file: $e');
+      return false;
+    }
   }
 }
