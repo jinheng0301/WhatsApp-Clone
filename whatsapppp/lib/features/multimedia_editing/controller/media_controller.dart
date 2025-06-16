@@ -246,8 +246,12 @@ class MediaController {
       ref.read(isEditingProvider.notifier).state = true;
       ref.read(editingProgressProvider.notifier).state = 0.1;
 
-      // Generate a path for the blob storage
-      final userId = 'user_id'; // You'll need to get this from your auth system
+      // FIX: Get the actual authenticated user ID instead of hardcoded string
+      final userId = mediaRepository.auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = originalFileName ?? 'edited_image_$timestamp.jpg';
       final blobPath = 'media/$userId/edited_images/$fileName';
@@ -261,10 +265,18 @@ class MediaController {
         context,
       );
 
+      // IMPORTANT: Also save metadata to Firestore using MediaRepository method
+      await mediaRepository.saveEditedImageToBlob(
+        editedImageFile: imageFile,
+        originalFileName: fileName,
+        context: context,
+        projectId: projectId,
+      );
+
       ref.read(editingProgressProvider.notifier).state = 1.0;
 
       showSnackBar(context, 'Image saved as blob successfully');
-      return blobId; // Return the blob ID instead of download URL
+      return blobId;
     } catch (e) {
       print('Failed to save image as blob: ${e.toString()}');
       showSnackBar(context, 'Failed to save image: ${e.toString()}');
@@ -522,8 +534,12 @@ class MediaController {
       ref.read(isEditingProvider.notifier).state = true;
       ref.read(editingProgressProvider.notifier).state = 0.1;
 
-      // Generate a path for the blob storage
-      const userId = 'user_id'; // You'll need to get this from your auth system
+      // FIX: Get the actual authenticated user ID
+      final userId = mediaRepository.auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = originalFileName ?? 'edited_media_$timestamp';
       final blobPath = 'media/$userId/edited_$mediaType/$fileName';
@@ -534,6 +550,15 @@ class MediaController {
         blobPath,
         mediaFile,
         context,
+      );
+
+      // Save metadata to Firestore using MediaRepository method
+      await mediaRepository.saveEditedMedia(
+        mediaFile: mediaFile,
+        mediaType: mediaType,
+        context: context,
+        originalFileName: originalFileName,
+        projectId: projectId,
       );
 
       ref.read(editingProgressProvider.notifier).state = 1.0;

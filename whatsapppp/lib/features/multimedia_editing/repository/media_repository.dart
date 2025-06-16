@@ -244,7 +244,7 @@ class MediaRepository {
     }
   }
 
-  // UPDATED: Save edited media using blob storage instead of Firebase Storage
+  // UPDATED: Save edited media using blob storage with corrected Firebase path
   Future<String> saveEditedMedia({
     required File mediaFile,
     required String mediaType,
@@ -266,7 +266,7 @@ class MediaRepository {
         context,
       );
 
-      // Save metadata to Firestore
+      // Save metadata to Firestore - UPDATED PATH
       await _saveMediaMetadataToFirestore(
         userId: userId,
         fileName: fileName,
@@ -283,7 +283,7 @@ class MediaRepository {
     }
   }
 
-  // NEW: Save edited image using blob storage
+  // UPDATED: Save edited image using blob storage with corrected Firebase path
   Future<String> saveEditedImageToBlob({
     required File editedImageFile,
     required String originalFileName,
@@ -292,7 +292,7 @@ class MediaRepository {
   }) async {
     try {
       final userId = auth.currentUser?.uid ?? 'anonymous';
-      final timestamp = DateTime.now().toString();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = projectId != null
           ? 'project_${projectId}_${timestamp}.jpg'
           : 'edited_${originalFileName}_${timestamp}.jpg';
@@ -306,7 +306,7 @@ class MediaRepository {
         context,
       );
 
-      // Save metadata to Firestore
+      // Save metadata to Firestore - UPDATED PATH
       await _saveMediaMetadataToFirestore(
         userId: userId,
         fileName: fileName,
@@ -323,7 +323,7 @@ class MediaRepository {
     }
   }
 
-  // UPDATED: Save metadata to Firestore with blob reference
+  // UPDATED: Save metadata to Firestore as top-level collection (like users, groups, status)
   Future<void> _saveMediaMetadataToFirestore({
     required String userId,
     required String fileName,
@@ -334,29 +334,38 @@ class MediaRepository {
     required String blobPath,
   }) async {
     try {
-      final docData = {
+      // Create data map similar to how user data is saved in AuthRepository
+      Map<String, dynamic> mediaData = {
         'userId': userId,
         'fileName': fileName,
         'originalFileName': originalFileName,
-        'blobId': blobId, // Store blob ID instead of download URL
+        'blobId': blobId,
         'blobPath': blobPath,
         'mediaType': mediaType,
-        'storageType': 'blob', // Indicate this is blob storage
+        'storageType': 'blob',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (projectId != null) {
-        docData['projectId'] = projectId;
+        mediaData['projectId'] = projectId;
       }
 
-      await firestore.collection('edited_media').add(docData);
+      // Save to 'edited_images' collection using document ID pattern like users
+      // Use blobId as document ID to ensure uniqueness
+      await firestore
+          .collection('edited_images') // TOP-LEVEL COLLECTION
+          .doc(blobId) // Use blobId as document ID instead of auto-generated
+          .set(mediaData, SetOptions(merge: true));
+
+      print(
+          'Media metadata saved to edited_images collection with doc ID: $blobId');
     } catch (e) {
       throw Exception('Failed to save media metadata: $e');
     }
   }
 
-  // Save editing session to Firestore
+// UPDATED: Save editing session to top-level collection
   Future<void> saveEditingSession({
     required String sessionId,
     required String mediaType,
@@ -364,14 +373,21 @@ class MediaRepository {
     required Map<String, dynamic> editingData,
   }) async {
     try {
-      await firestore.collection('editing_sessions').doc(sessionId).set({
+      // Create data map similar to how user data is saved
+      Map<String, dynamic> sessionData = {
         'userId': auth.currentUser!.uid,
         'mediaType': mediaType,
         'originalMediaUrl': originalMediaUrl,
         'editingData': editingData,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      // Save to 'editing_sessions' collection as top-level collection
+      await firestore
+          .collection('editing_sessions') // TOP-LEVEL COLLECTION
+          .doc(sessionId)
+          .set(sessionData, SetOptions(merge: true));
     } catch (e) {
       throw Exception('Failed to save editing session: $e');
     }
@@ -393,7 +409,7 @@ class MediaRepository {
     }
   }
 
-  // Get user's editing history
+  // UPDATED: Get user's editing history from top-level collection
   Stream<List<Map<String, dynamic>>> getUserEditingHistory() {
     return firestore
         .collection('editing_sessions')
@@ -409,7 +425,7 @@ class MediaRepository {
             .toList());
   }
 
-  // NEW: Get media by blob ID
+  // Get media by blob ID
   Future<File?> getMediaFileFromBlob({
     required String blobId,
     required String userId,
@@ -437,14 +453,47 @@ class MediaRepository {
     }
   }
 
-  // NEW: Get user's media files from blob storage
+  // UPDATED: Get user's media files from top-level collection
   Stream<List<Map<String, dynamic>>> getUserMediaFiles() {
     return firestore
-        .collection('edited_media')
+        .collection('edited_images')
         .where('userId', isEqualTo: auth.currentUser!.uid)
         .where('storageType', isEqualTo: 'blob')
         .orderBy('createdAt', descending: true)
         .limit(50)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {
+                    'id': doc.id,
+                    ...doc.data(),
+                  })
+              .toList(),
+        );
+  }
+
+  // UPDATED: Delete media file using document ID
+  Future<bool> deleteMediaFile(String blobId, String userId) async {
+    try {
+      // Delete using blobId as document ID
+      await firestore.collection('edited_images').doc(blobId).delete();
+
+      // Delete blob data from blob storage
+      // await blobRepository.deleteBlob(blobId, userId);
+
+      return true;
+    } catch (e) {
+      print('Failed to delete media file: $e');
+      return false;
+    }
+  }
+
+  // NEW: Get all media files for admin/management purposes
+  Stream<List<Map<String, dynamic>>> getAllMediaFiles() {
+    return firestore
+        .collection('edited_images')
+        .orderBy('createdAt', descending: true)
+        .limit(100)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => {
@@ -454,25 +503,18 @@ class MediaRepository {
             .toList());
   }
 
-  // NEW: Delete media file and its blob
-  Future<bool> deleteMediaFile(
-      String documentId, String blobId, String userId) async {
-    try {
-      // Delete from Firestore
-      await firestore.collection('edited_media').doc(documentId).delete();
-
-      // Delete blob data
-      await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('media')
-          .doc(blobId)
-          .delete();
-
-      return true;
-    } catch (e) {
-      print('Failed to delete media file: $e');
-      return false;
-    }
+  // NEW: Get media files by project ID
+  Stream<List<Map<String, dynamic>>> getProjectMediaFiles(String projectId) {
+    return firestore
+        .collection('edited_images')
+        .where('projectId', isEqualTo: projectId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  ...doc.data(),
+                })
+            .toList());
   }
 }
