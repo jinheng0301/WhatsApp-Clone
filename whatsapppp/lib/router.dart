@@ -13,7 +13,7 @@ import 'package:whatsapppp/features/select_contacts/screens/select_contact_scree
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_screen.dart';
 import 'package:whatsapppp/models/status_model.dart';
-import 'package:whatsapppp/profile/screen/profile_screen.dart';
+import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
 Route<dynamic> onGenerateRoute(RouteSettings settings) {
   switch (settings.name) {

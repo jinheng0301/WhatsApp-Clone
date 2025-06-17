@@ -12,7 +12,7 @@ import 'package:whatsapppp/features/multimedia_editing/screens/new_project_scree
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_contacts_screen.dart';
-import 'package:whatsapppp/profile/screen/profile_screen.dart';
+import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
 class MobileLayoutScreen extends ConsumerStatefulWidget {
   const MobileLayoutScreen({super.key});
