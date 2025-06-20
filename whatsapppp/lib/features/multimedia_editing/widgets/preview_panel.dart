@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:whatsapppp/common/widgets/loader.dart';
+import 'package:whatsapppp/features/multimedia_editing/services/media_editor_service.dart';
 
 // Model for overlay items
 class OverlayItem {
@@ -17,6 +19,8 @@ class OverlayItem {
   bool isSelected;
   double rotation;
   double scale;
+  Duration? startTime;
+  Duration? endTime;
 
   OverlayItem({
     required this.id,
@@ -31,6 +35,8 @@ class OverlayItem {
     this.isSelected = false,
     this.rotation = 0.0,
     this.scale = 1.0,
+    this.startTime,
+    this.endTime,
   });
 }
 
@@ -55,13 +61,27 @@ class PreviewPanel extends StatefulWidget {
 class PreviewPanelState extends State<PreviewPanel> {
   VideoPlayerController? _videoController;
   bool _isPlaying = false;
+  bool _isInitialized = false;
   List<OverlayItem> _overlayItems = [];
   OverlayItem? _selectedItem;
   Size _previewSize = Size.zero;
+
+  // Video editing specific properties
+  Duration _videoDuration = Duration.zero;
+  Duration _currentPosition = Duration.zero;
+  Duration _startTrim = Duration.zero;
+  Duration _endTrim = Duration.zero;
+  bool _isLooping = false;
+  double _playbackSpeed = 1.0;
+  double _volume = 1.0;
+
   // Variables for gesture handling
   double _initialScale = 1.0;
   double _initialRotation = 0.0;
   Offset _initialFocalPoint = Offset.zero;
+
+  // Add offset tracking for split videos
+  Duration _videoStartOffset = Duration.zero; // Tracks original start time
 
   @override
   void initState() {
@@ -71,11 +91,189 @@ class PreviewPanelState extends State<PreviewPanel> {
     }
   }
 
-  void _initializeVideoPlayer() {
+  // Make these methods public for external access
+  void playVideo() => _playVideo();
+  void pauseVideo() => _pauseVideo();
+
+  // Add method to sync timeline position with video position
+  void updateTimelinePosition(Duration position) {
+    if (widget.isVideo && _videoController != null) {
+      setState(() {
+        _currentPosition = position;
+      });
+    }
+  }
+
+  // Modified initialization for split videos
+  void _initializeVideoPlayer() async {
     _videoController = VideoPlayerController.file(File(widget.mediaPath))
       ..initialize().then((_) {
-        setState(() {});
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _videoDuration = _videoController!.value.duration;
+            _endTrim = _videoDuration;
+            // Reset current position when loading split video
+            _currentPosition = Duration.zero;
+          });
+
+          // Listen to video position changes
+          _videoController!.addListener(_onVideoPositionChanged);
+
+          // Seek to beginning to ensure proper start
+          _videoController!.seekTo(Duration.zero);
+        }
+      }).catchError((error) {
+        print('Error initializing video: $error');
       });
+  }
+
+  // Method to handle video splitting and reload
+  void handleVideoSplit(String newVideoPath, Duration originalSplitPoint) {
+    // Store the original offset
+    _videoStartOffset = originalSplitPoint;
+
+    // Dispose current controller
+    _videoController?.dispose();
+
+    // Update the media path
+    setState(() {
+      _isInitialized = false;
+    });
+
+    // Reinitialize with new video
+    _videoController = VideoPlayerController.file(File(newVideoPath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _videoDuration = _videoController!.value.duration;
+            _endTrim = _videoDuration;
+            _currentPosition = Duration.zero;
+            _startTrim = Duration.zero;
+          });
+
+          _videoController!.addListener(_onVideoPositionChanged);
+          _videoController!.seekTo(Duration.zero);
+
+          print(
+              'Video split and reloaded. New duration: ${_formatDuration(_videoDuration)}');
+          print('Original start offset: ${_formatDuration(_videoStartOffset)}');
+        }
+      });
+  }
+
+  // Enhanced video position listener with timeline sync
+  void _onVideoPositionChanged() {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      final position = _videoController!.value.position;
+
+      // Check if video is playing within trim range
+      if (_isPlaying && position >= _endTrim) {
+        if (_isLooping) {
+          _videoController!.seekTo(_startTrim);
+        } else {
+          _pauseVideo();
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+
+        // You could add a callback here to update timeline
+        // widget.onPositionChanged?.call(position);
+      }
+    }
+  }
+
+  // Enhanced video control methods
+  void _playVideo() {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      // Ensure we're within trim range
+      if (_currentPosition < _startTrim || _currentPosition > _endTrim) {
+        _videoController!.seekTo(_startTrim);
+      }
+
+      _videoController!.play();
+      setState(() => _isPlaying = true);
+    }
+  }
+
+  void _pauseVideo() {
+    if (_videoController != null) {
+      _videoController!.pause();
+      setState(() => _isPlaying = false);
+    }
+  }
+
+  void _togglePlayPause() {
+    if (_isPlaying) {
+      _pauseVideo();
+    } else {
+      _playVideo();
+    }
+  }
+
+  // Video editing specific methods
+  void setTrimRange(Duration start, Duration end) {
+    if (start < Duration.zero || end > _videoDuration || start >= end) {
+      print('Invalid trim range: $start - $end');
+      return;
+    }
+
+    setState(() {
+      _startTrim = start;
+      _endTrim = end;
+    });
+
+    // If currently playing and outside trim range, seek to start
+    if (_videoController != null && _isPlaying) {
+      if (_currentPosition < start || _currentPosition > end) {
+        _videoController!.seekTo(start);
+      }
+    }
+
+    // Notify parent component about trim changes
+    print(
+        'Trim range set: ${_formatDuration(start)} - ${_formatDuration(end)}');
+  }
+
+  void seekToPosition(Duration position) {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      // Clamp position within trim range
+      final clampedPosition = Duration(
+        milliseconds: position.inMilliseconds.clamp(
+          _startTrim.inMilliseconds,
+          _endTrim.inMilliseconds,
+        ),
+      );
+
+      _videoController!.seekTo(clampedPosition);
+      setState(() => _currentPosition = clampedPosition);
+    }
+  }
+
+  void setPlaybackSpeed(double speed) {
+    setState(() => _playbackSpeed = speed);
+    if (_videoController != null) {
+      _videoController!.setPlaybackSpeed(speed);
+    }
+  }
+
+  void setVolume(double volume) {
+    setState(() => _volume = volume);
+    if (_videoController != null) {
+      _videoController!.setVolume(volume);
+    }
+  }
+
+  void toggleLooping() {
+    setState(() => _isLooping = !_isLooping);
+    if (_videoController != null) {
+      _videoController!.setLooping(_isLooping);
+    }
   }
 
   @override
@@ -92,6 +290,8 @@ class PreviewPanelState extends State<PreviewPanel> {
     String fontFamily = 'Roboto',
     bool isBold = false,
     bool isItalic = false,
+    Duration? startTime,
+    Duration? endTime,
   }) {
     final newItem = OverlayItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -103,8 +303,11 @@ class PreviewPanelState extends State<PreviewPanel> {
       fontFamily: fontFamily,
       isBold: isBold,
       isItalic: isItalic,
-      rotation: 0.0, // Initialize with no rotation
-      scale: 1.0, // Initialize with normal scale
+      rotation: 0.0,
+      scale: 1.0,
+      // Add timing properties for video overlays
+      startTime: startTime ?? Duration.zero,
+      endTime: endTime ?? _videoDuration,
     );
 
     setState(() {
@@ -148,6 +351,42 @@ class PreviewPanelState extends State<PreviewPanel> {
     }
   }
 
+  // Add method to get current video state for timeline synchronization
+  Map<String, dynamic> getVideoState() {
+    return {
+      'currentPosition': _currentPosition,
+      'duration': _videoDuration,
+      'startTrim': _startTrim,
+      'endTrim': _endTrim,
+      'isPlaying': _isPlaying,
+      'playbackSpeed': _playbackSpeed,
+      'volume': _volume,
+      'isLooping': _isLooping,
+    };
+  }
+
+  // Method to apply trim and export trimmed video
+  Future<String?> exportTrimmedVideo() async {
+    if (!widget.isVideo ||
+        _startTrim == Duration.zero && _endTrim == _videoDuration) {
+      return widget.mediaPath; // No trimming needed
+    }
+
+    try {
+      // This would integrate with your MediaEditorService
+      final trimmedPath = await MediaEditorService.trimVideo(
+        inputPath: widget.mediaPath,
+        startTime: _startTrim,
+        endTime: _endTrim,
+      );
+
+      return trimmedPath;
+    } catch (e) {
+      print('Error exporting trimmed video: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -171,8 +410,12 @@ class PreviewPanelState extends State<PreviewPanel> {
                 // Media content
                 widget.isVideo ? _buildVideoPreview() : _buildImagePreview(),
 
-                // Overlay items
-                ..._overlayItems.map((item) => _buildDraggableOverlay(item)),
+                // Video controls overlay (only for video)
+                if (widget.isVideo && _isInitialized) _buildVideoControls(),
+
+                // Overlay items (filtered by time for videos)
+                ..._getVisibleOverlays()
+                    .map((item) => _buildDraggableOverlay(item)),
 
                 // Delete button for selected item
                 if (_selectedItem != null)
@@ -186,12 +429,153 @@ class PreviewPanelState extends State<PreviewPanel> {
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
                   ),
+
+                // Video info overlay
+                if (widget.isVideo && _isInitialized)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_formatDuration(_currentPosition)} / ${_formatDuration(_videoDuration)}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12),
+                          ),
+                          if (_playbackSpeed != 1.0)
+                            Text(
+                              'Speed: ${_playbackSpeed}x',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                            ),
+                          if (_isLooping)
+                            const Text(
+                              'Looping',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  // Get overlays that should be visible at current time (for video editing)
+  List<OverlayItem> _getVisibleOverlays() {
+    if (!widget.isVideo) return _overlayItems;
+
+    return _overlayItems.where((item) {
+      final startTime = item.startTime ?? Duration.zero;
+      final endTime = item.endTime ?? _videoDuration;
+      return _currentPosition >= startTime && _currentPosition <= endTime;
+    }).toList();
+  }
+
+  Widget _buildVideoControls() {
+    return Positioned(
+      bottom: 20,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            // Skip to start
+            IconButton(
+              onPressed: () => seekToPosition(_startTrim),
+              icon: const Icon(Icons.skip_previous, color: Colors.white),
+              tooltip: 'Go to start',
+            ),
+
+            // Play/Pause
+            IconButton(
+              onPressed: _togglePlayPause,
+              icon: Icon(
+                _isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.white,
+                size: 32,
+              ),
+              tooltip: _isPlaying ? 'Pause' : 'Play',
+            ),
+
+            // Skip to end
+            IconButton(
+              onPressed: () => seekToPosition(_endTrim),
+              icon: const Icon(Icons.skip_next, color: Colors.white),
+              tooltip: 'Go to end',
+            ),
+
+            // Loop toggle
+            IconButton(
+              onPressed: toggleLooping,
+              icon: Icon(
+                _isLooping ? Icons.repeat : Icons.repeat,
+                color: _isLooping ? Colors.green : Colors.white,
+              ),
+              tooltip: 'Toggle loop',
+            ),
+
+            // Speed control
+            PopupMenuButton<double>(
+              icon: const Icon(Icons.speed, color: Colors.white),
+              tooltip: 'Playback speed',
+              onSelected: setPlaybackSpeed,
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 0.25, child: Text('0.25x')),
+                const PopupMenuItem(value: 0.5, child: Text('0.5x')),
+                const PopupMenuItem(value: 1.0, child: Text('1.0x')),
+                const PopupMenuItem(value: 1.5, child: Text('1.5x')),
+                const PopupMenuItem(value: 2.0, child: Text('2.0x')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoPreview() {
+    if (_videoController == null || !_isInitialized) {
+      return const Center(child: Loader());
+    }
+
+    return Center(
+      child: AspectRatio(
+        aspectRatio: _videoController!.value.aspectRatio,
+        child: VideoPlayer(_videoController!),
+      ),
+    );
+  }
+
+  // Format duration to show actual timeline position
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
   }
 
   Widget _buildDraggableOverlay(OverlayItem item) {
@@ -522,33 +906,6 @@ class PreviewPanelState extends State<PreviewPanel> {
     );
   }
 
-  Widget _buildVideoPreview() {
-    if (_videoController == null || !_videoController!.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Center(
-      child: AspectRatio(
-        aspectRatio: _videoController!.value.aspectRatio,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            VideoPlayer(_videoController!),
-            if (!_isPlaying)
-              IconButton(
-                onPressed: _togglePlayPause,
-                icon: const Icon(
-                  Icons.play_arrow,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildImagePreview() {
     return Center(
       child: Image.file(
@@ -558,18 +915,15 @@ class PreviewPanelState extends State<PreviewPanel> {
     );
   }
 
-  void _togglePlayPause() {
-    setState(() {
-      if (_videoController!.value.isPlaying) {
-        _videoController!.pause();
-        _isPlaying = false;
-      } else {
-        _videoController!.play();
-        _isPlaying = true;
-      }
-    });
-  }
-
   // Getter for overlay items (for external access)
   List<OverlayItem> get overlayItems => _overlayItems;
+
+  Duration get currentPosition => _currentPosition;
+  Duration get videoDuration => _videoDuration;
+  Duration get startTrim => _startTrim;
+  Duration get endTrim => _endTrim;
+  bool get isPlaying => _isPlaying;
+  double get playbackSpeed => _playbackSpeed;
+  double get volume => _volume;
+  bool get isLooping => _isLooping;
 }

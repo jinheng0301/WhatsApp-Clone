@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_trimmer/video_trimmer.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
+import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/multimedia_editing/controller/media_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/function_handler/audio_handler.dart';
 import 'package:whatsapppp/features/multimedia_editing/function_handler/image_handler.dart';
@@ -23,8 +24,10 @@ class TrimmerDialog extends StatefulWidget {
 
 class _TrimmerDialogState extends State<TrimmerDialog> {
   final Trimmer _trimmer = Trimmer();
-  double _startValue = 0.0, _endValue = 0.0;
+  double _startValue = 0.0;
+  double _endValue = 0.0;
   bool _isLoading = true;
+  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -33,22 +36,114 @@ class _TrimmerDialogState extends State<TrimmerDialog> {
   }
 
   Future<void> _loadVideo() async {
-    await _trimmer.loadVideo(videoFile: File(widget.filePath));
-    setState(() => _isLoading = false);
+    try {
+      await _trimmer.loadVideo(videoFile: File(widget.filePath));
+      final videoDuration =
+          await _trimmer.videoPlayerController!.value.duration;
+      setState(() {
+        _isLoading = false;
+        _endValue = videoDuration.inMilliseconds.toDouble();
+      });
+    } catch (e) {
+      print('Error loading video: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _trimmer.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return const Center(child: Loader());
 
     return AlertDialog(
       title: const Text('Trim Video'),
       content: SizedBox(
-        height: 250,
-        child: Column(children: [
-          VideoViewer(trimmer: _trimmer),
-          const SizedBox(height: 12),
-        ]),
+        height: 400,
+        width: double.maxFinite,
+        child: Column(
+          children: [
+            // Video Preview
+            Expanded(
+              child: VideoViewer(trimmer: _trimmer),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Timeline Trimmer
+            Container(
+              height: 60,
+              child: TrimViewer(
+                trimmer: _trimmer,
+                viewerHeight: 60,
+                viewerWidth: MediaQuery.of(context).size.width,
+                onChangeStart: (value) => setState(() => _startValue = value),
+                onChangeEnd: (value) => setState(() => _endValue = value),
+                onChangePlaybackState: (value) =>
+                    setState(() => _isPlaying = value),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Time display
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                    'Start: ${_formatDuration(Duration(milliseconds: _startValue.round()))}'),
+                Text(
+                    'End: ${_formatDuration(Duration(milliseconds: _endValue.round()))}'),
+              ],
+            ),
+
+            // Playback controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () async {
+                    await _trimmer.videoPlayerController!.seekTo(
+                      Duration(milliseconds: _startValue.round()),
+                    );
+                  },
+                  icon: const Icon(Icons.skip_previous),
+                ),
+                IconButton(
+                  onPressed: () async {
+                    if (_isPlaying) {
+                      await _trimmer.videoPlayerController!.pause();
+                    } else {
+                      await _trimmer.videoPlayerController!.play();
+                    }
+                    setState(() => _isPlaying = !_isPlaying);
+                  },
+                  icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                ),
+                IconButton(
+                  onPressed: () async {
+                    await _trimmer.videoPlayerController!.seekTo(
+                      Duration(milliseconds: _endValue.round()),
+                    );
+                  },
+                  icon: const Icon(Icons.skip_next),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -123,8 +218,13 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         title: Text(widget.isVideo ? 'Video Editor' : 'Photo Editor'),
         actions: [
           IconButton(
-              icon: const Icon(Icons.import_export), onPressed: _exportProject),
-          IconButton(icon: const Icon(Icons.share), onPressed: _shareProject),
+            icon: const Icon(Icons.import_export),
+            onPressed: _exportProject,
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: _shareProject,
+          ),
         ],
       ),
       body: Column(
@@ -138,7 +238,33 @@ class _EditScreenState extends ConsumerState<EditScreen> {
               onOverlaysChanged: (overlays) => _currentOverlays = overlays,
             ),
           ),
-          if (widget.isVideo) const Expanded(flex: 2, child: TimelineEditor()),
+
+          // Updated TimelineEditor with proper integration
+          if (widget.isVideo) ...[
+            Expanded(
+              flex: 2,
+              child: TimelineEditor(
+                videoPath: widget.mediaPath,
+                onTrimChanged: (start, end) {
+                  // Connect timeline trim changes to preview panel
+                  _previewPanelKey.currentState?.setTrimRange(start, end);
+                },
+                onPlay: () {
+                  // Connect timeline play to preview panel
+                  _previewPanelKey.currentState?.playVideo();
+                },
+                onPause: () {
+                  // Connect timeline pause to preview panel
+                  _previewPanelKey.currentState?.pauseVideo();
+                },
+                onSeek: (position) {
+                  // Connect timeline seeking to preview panel
+                  _previewPanelKey.currentState?.seekToPosition(position);
+                },
+              ),
+            ),
+          ],
+
           _buildTabBar(),
           Expanded(flex: 2, child: _buildToolOptions()),
         ],
@@ -216,7 +342,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     final tools = widget.isVideo
         ? [
             ('Split', Icons.cut, _showSplitDialog),
-            ('Speed', Icons.speed, _showSpeedDialog),
             ('Volume', Icons.volume_up, _showVideoVolumeDialog),
             ('Rotate', Icons.rotate_90_degrees_ccw, () => _rotateVideo(90)),
             ('Transform', Icons.transform, () {}), // To be implemented
@@ -561,28 +686,41 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     _videoHandler.showSplitDialog(
       context,
       widget.mediaPath,
-      (splitPaths) {
-        // Handle split video paths
+      (splitPaths, originalSplitPoint) {
+        // Added originalSplitPoint parameter
         if (splitPaths.isNotEmpty) {
-          setState(() => widget.mediaPath = splitPaths.first);
-          showSnackBar(context, 'Video split into ${splitPaths.length} parts');
+          setState(() {
+            widget.mediaPath =
+                splitPaths[1]; // Use second part (from split point to end)
+          });
+
+          // Update preview panel with split video and original timeline offset
+          if (_previewPanelKey.currentState != null) {
+            _previewPanelKey.currentState!.handleVideoSplit(
+              splitPaths[1], // New video path (second part)
+              originalSplitPoint, // Original split point from the full video
+            );
+          }
+
+          // Update timeline editor with split information
+          final timelineKey = GlobalKey<TimelineEditorState>();
+          // You'll need to add this key to TimelineEditor
+          if (timelineKey.currentState != null) {
+            timelineKey.currentState!.updateForSplitVideo(
+              originalSplitPoint,
+              Duration
+                  .zero, // New duration will be calculated from the split video
+            );
+          }
+
+          showSnackBar(context, 'Video split successfully');
         }
       },
     );
   }
 
-  void _showSpeedDialog() {
-    if (!widget.isVideo) return;
-
-    _videoHandler.showSpeedDialog(
-      context,
-      widget.mediaPath,
-      (newPath) => setState(() => widget.mediaPath = newPath),
-    );
-  }
-
   void _rotateVideo(int degrees) {
-    if (!widget.isVideo) return;
+    if (widget.isVideo) return;
 
     _videoHandler.rotateVideo(
       context,

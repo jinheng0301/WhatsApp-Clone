@@ -46,7 +46,8 @@ class VideoHandler {
   Future<void> showSplitDialog(
     BuildContext context,
     String videoPath,
-    Function(List<String> splitPaths) onVideoSplit,
+    Function(List<String> splitPaths, Duration originalSplitPoint)
+        onVideoSplit, // Added originalSplitPoint parameter
   ) async {
     final controller = TextEditingController();
     final result = await showDialog<int>(
@@ -90,11 +91,12 @@ class VideoHandler {
     );
 
     if (result != null && result > 0) {
+      final splitPoint = Duration(seconds: result);
       final splitPaths = await MediaEditorService.splitVideo(
         videoPath: videoPath,
-        splitPoint: Duration(seconds: result),
+        splitPoint: splitPoint,
       );
-      onVideoSplit(splitPaths);
+      onVideoSplit(splitPaths, splitPoint); // Pass the original split point
       showSnackBar(context, 'Video split into ${splitPaths.length} parts');
     }
   }

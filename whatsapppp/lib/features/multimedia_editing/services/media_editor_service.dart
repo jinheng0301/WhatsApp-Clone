@@ -51,6 +51,47 @@ class MediaEditorService {
     return outputPath;
   }
 
+  static Future<String> trimVideo({
+    required String inputPath,
+    required Duration startTime,
+    required Duration endTime,
+  }) async {
+    final outputPath = '${inputPath}_trimmed.mp4';
+
+    // Calculate the duration of the trimmed video
+    final duration = endTime - startTime;
+
+    // Build FFmpeg command for trimming
+    final command = '-i $inputPath '
+        '-ss ${_formatDurationForFFmpeg(startTime)} '
+        '-t ${_formatDurationForFFmpeg(duration)} '
+        '-c copy $outputPath';
+
+    try {
+      final session = await FFmpegKit.execute(command);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        return outputPath;
+      } else {
+        throw Exception('Failed to trim video. Return code: $returnCode');
+      }
+    } catch (e) {
+      throw Exception('Error trimming video: $e');
+    }
+  }
+
+  // Helper method to format Duration for FFmpeg
+  static String _formatDurationForFFmpeg(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    int milliseconds = duration.inMilliseconds.remainder(1000);
+    String threeDigitMilliseconds = milliseconds.toString().padLeft(3, "0");
+
+    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds.$threeDigitMilliseconds";
+  }
+
   static Future<void> _applyVideoEffect(
     String inputPath,
     String effectType,
@@ -242,21 +283,141 @@ class MediaEditorService {
     return outputPath;
   }
 
-  // Split video
+  // Enhanced split video function that creates new video starting from split point
   static Future<List<String>> splitVideo({
     required String videoPath,
     required Duration splitPoint,
+    Duration? originalStartOffset, // Track original start offset
   }) async {
     final firstHalf = '${videoPath}_part1.mp4';
     final secondHalf = '${videoPath}_part2.mp4';
 
+    // First part: from beginning to split point
     await FFmpegKit.execute(
         '-i $videoPath -t ${splitPoint.inSeconds} -c copy $firstHalf');
 
+    // Second part: from split point to end (this becomes the new "main" video)
+    // Use -avoid_negative_ts make_zero to reset timestamps
     await FFmpegKit.execute(
-        '-i $videoPath -ss ${splitPoint.inSeconds} -c copy $secondHalf');
+        '-i $videoPath -ss ${splitPoint.inSeconds} -avoid_negative_ts make_zero -c copy $secondHalf');
 
     return [firstHalf, secondHalf];
+  }
+
+  // New function to get video metadata including duration
+  static Future<Duration> getVideoDuration(String videoPath) async {
+    // This would need to be implemented using FFprobe or video_player
+    // For now, returning a placeholder
+    return const Duration(seconds: 30);
+  }
+
+  // Additional video manipulation methods that might be useful
+  // Merge/Concatenate videos
+  static Future<String> mergeVideos({
+    required List<String> videoPaths,
+  }) async {
+    if (videoPaths.isEmpty) throw Exception('No videos to merge');
+
+    final outputPath = '${videoPaths.first}_merged.mp4';
+
+    // Create a temporary file list for FFmpeg concat
+    final listFile = File('${videoPaths.first}_list.txt');
+    final listContent = videoPaths.map((path) => 'file \'$path\'').join('\n');
+    await listFile.writeAsString(listContent);
+
+    try {
+      final command =
+          '-f concat -safe 0 -i ${listFile.path} -c copy $outputPath';
+      final session = await FFmpegKit.execute(command);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        return outputPath;
+      } else {
+        throw Exception('Failed to merge videos. Return code: $returnCode');
+      }
+    } finally {
+      // Clean up temporary file
+      if (await listFile.exists()) {
+        await listFile.delete();
+      }
+    }
+  }
+
+  // Extract audio from video
+  static Future<String> extractAudio({
+    required String videoPath,
+  }) async {
+    final outputPath = '${videoPath}_audio.mp3';
+
+    final command = '-i $videoPath -vn -acodec mp3 $outputPath';
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      return outputPath;
+    } else {
+      throw Exception('Failed to extract audio. Return code: $returnCode');
+    }
+  }
+
+  // Add audio to video (replace existing audio)
+  static Future<String> replaceVideoAudio({
+    required String videoPath,
+    required String audioPath,
+  }) async {
+    final outputPath = '${videoPath}_with_audio.mp4';
+
+    final command =
+        '-i $videoPath -i $audioPath -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 $outputPath';
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      return outputPath;
+    } else {
+      throw Exception('Failed to replace audio. Return code: $returnCode');
+    }
+  }
+
+  // Adjust video volume
+  static Future<String> adjustVolume({
+    required String videoPath,
+    required double
+        volumeLevel, // 0.0 to 2.0 (0 = mute, 1 = normal, 2 = double)
+  }) async {
+    final outputPath =
+        '${videoPath}_volume_${volumeLevel.toStringAsFixed(1)}.mp4';
+
+    final command = '-i $videoPath -af "volume=$volumeLevel" $outputPath';
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      return outputPath;
+    } else {
+      throw Exception('Failed to adjust volume. Return code: $returnCode');
+    }
+  }
+
+  // Create video thumbnail
+  static Future<String> createThumbnail({
+    required String videoPath,
+    Duration? timeOffset,
+  }) async {
+    final outputPath = '${videoPath}_thumbnail.jpg';
+    final offset = timeOffset ?? const Duration(seconds: 1);
+
+    final command =
+        '-i $videoPath -ss ${_formatDurationForFFmpeg(offset)} -vframes 1 $outputPath';
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (ReturnCode.isSuccess(returnCode)) {
+      return outputPath;
+    } else {
+      throw Exception('Failed to create thumbnail. Return code: $returnCode');
+    }
   }
 
   // ============ AUDIO FUNCTIONS ============
