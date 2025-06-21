@@ -6,6 +6,7 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:whatsapppp/common/utils/utils.dart';
 
 class AudioService {
   static final AudioPlayer _audioPlayer = AudioPlayer();
@@ -101,31 +102,100 @@ class AudioService {
     }
   }
 
-  // Add voice over to video
   static Future<String?> addVoiceOverToVideo({
     required String videoPath,
     required String voiceOverPath,
     double voiceVolume = 1.0,
-    double originalVolume = 0.3, // Lower original audio when adding voice over
+    double originalVolume = 0.3,
   }) async {
     try {
       final outputPath = '${videoPath}_with_voiceover.mp4';
 
-      final command = '-i "$videoPath" -i "$voiceOverPath" '
-          '-filter_complex "[0:a]volume=$originalVolume[a0];[1:a]volume=$voiceVolume[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[out]" '
-          '-map 0:v -map "[out]" -c:v copy -c:a aac "$outputPath"';
+      // Check if the input is an image or video
+      final isImage = videoPath.toLowerCase().endsWith('.jpg') ||
+          videoPath.toLowerCase().endsWith('.jpeg') ||
+          videoPath.toLowerCase().endsWith('.png') ||
+          videoPath.toLowerCase().endsWith('.bmp') ||
+          videoPath.toLowerCase().endsWith('.gif');
+
+      String command;
+
+      if (isImage) {
+        // FIXED: Correct FFmpeg command for images
+        command = '-loop 1 -i "$videoPath" -i "$voiceOverPath" '
+            '-filter_complex "[1:a]volume=$voiceVolume[a1]" '
+            '-c:v libx264 -c:a aac -pix_fmt yuv420p '
+            '-map 0:v -map "[a1]" -shortest "$outputPath"';
+      } else {
+        // For videos: Mix the original audio with voice over
+        command = '-i "$videoPath" -i "$voiceOverPath" '
+            '-filter_complex "[0:a]volume=$originalVolume[a0];[1:a]volume=$voiceVolume[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[out]" '
+            '-map 0:v -map "[out]" -c:v copy -c:a aac "$outputPath"';
+      }
+
+      print('Executing FFmpeg command: $command');
 
       final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
+      final output = await session.getOutput();
+
+      print('FFmpeg output: $output');
 
       if (ReturnCode.isSuccess(returnCode)) {
+        print('Voice over added successfully: $outputPath');
         return outputPath;
       } else {
-        print('Failed to add voice over');
+        print('Failed to add voice over. Return code: $returnCode');
         return null;
       }
     } catch (e) {
       print('Error adding voice over: $e');
+      return null;
+    }
+  }
+
+  // Alternative simpler version for images if the above doesn't work
+  static Future<String?> addVoiceOverToImage({
+    required String imagePath,
+    required String voiceOverPath,
+    double voiceVolume = 1.0,
+    int?
+        durationSeconds, // Optional: specify duration, otherwise uses voice over length
+  }) async {
+    try {
+      final outputPath = '${imagePath}_with_voiceover.mp4';
+
+      String command;
+      if (durationSeconds != null) {
+        // Use specified duration
+        command = '-loop 1 -i "$imagePath" -i "$voiceOverPath" '
+            '-filter_complex "[1:a]volume=$voiceVolume[a1]" '
+            '-c:v libx264 -t $durationSeconds -pix_fmt yuv420p '
+            '-c:a aac -map 0:v -map "[a1]" "$outputPath"';
+      } else {
+        // Use voice over duration
+        command = '-loop 1 -i "$imagePath" -i "$voiceOverPath" '
+            '-filter_complex "[1:a]volume=$voiceVolume[a1]" '
+            '-c:v libx264 -pix_fmt yuv420p '
+            '-c:a aac -map 0:v -map "[a1]" -shortest "$outputPath"';
+      }
+
+      print('Executing FFmpeg command for image: $command');
+
+      final session = await FFmpegKit.execute(command);
+      final returnCode = await session.getReturnCode();
+      final output = await session.getOutput();
+
+      print('FFmpeg output: $output');
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        return outputPath;
+      } else {
+        print('Failed to add voice over to image');
+        return null;
+      }
+    } catch (e) {
+      print('Error adding voice over to image: $e');
       return null;
     }
   }
@@ -140,9 +210,7 @@ class AudioService {
       final permission = await Permission.microphone.request();
       if (!permission.isGranted) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission required')),
-          );
+          showSnackBar(context, 'Microphone permission required');
         }
         return null;
       }

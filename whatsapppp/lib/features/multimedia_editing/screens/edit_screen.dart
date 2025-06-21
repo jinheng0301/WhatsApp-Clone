@@ -182,7 +182,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   // Text editing properties - consolidated
   final _textController = TextEditingController();
 
-  final _previewPanelKey = GlobalKey<PreviewPanelState>();
+  final GlobalKey<PreviewPanelState> _previewPanelKey =
+      GlobalKey<PreviewPanelState>();
   final _toolTabs = ['Edit', 'Text', 'Audio', 'Effects', 'Filters'];
   List<OverlayItem> _currentOverlays = [];
 
@@ -436,8 +437,10 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                     children: [
                       Icon(Icons.volume_up, color: Colors.green),
                       SizedBox(width: 8),
-                      Text('Original Audio',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Original Audio',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -449,7 +452,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                           icon: const Icon(Icons.volume_off),
                           label: const Text('Mute'),
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red),
+                            backgroundColor: Colors.red,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -479,8 +483,10 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                     children: [
                       Icon(Icons.mic, color: Colors.purple),
                       SizedBox(width: 8),
-                      Text('Voice Over',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Voice Over',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -492,7 +498,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                           icon: const Icon(Icons.mic),
                           label: const Text('Record'),
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red),
+                            backgroundColor: Colors.red,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -522,8 +529,10 @@ class _EditScreenState extends ConsumerState<EditScreen> {
                     children: [
                       Icon(Icons.tune, color: Colors.orange),
                       SizedBox(width: 8),
-                      Text('Advanced',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Advanced',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -924,7 +933,11 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     await _audioHandler.recordVoiceOver(
       context,
       widget.mediaPath,
-      (newPath) => setState(() => widget.mediaPath = newPath),
+      (newPath) {
+        setState(() => widget.mediaPath = newPath);
+        // ADDED: Update preview panel when media path changes
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
+      },
     );
   }
 

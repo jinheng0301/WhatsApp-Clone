@@ -83,11 +83,84 @@ class PreviewPanelState extends State<PreviewPanel> {
   // Add offset tracking for split videos
   Duration _videoStartOffset = Duration.zero; // Tracks original start time
 
+  // Add this property to track dynamic video state
+  bool _isDynamicVideo = false;
+  // Tracks if image became video due to voice over
+
   @override
   void initState() {
     super.initState();
     if (widget.isVideo) {
       _initializeVideoPlayer();
+    }
+
+    // Check if it's a video file regardless of the initial isVideo flag
+    _checkAndInitializeMedia();
+  }
+
+  // New method to check media type and initialize appropriately
+  void _checkAndInitializeMedia() {
+    final isVideoFile = widget.mediaPath.toLowerCase().endsWith('.mp4') ||
+        widget.mediaPath.toLowerCase().endsWith('.mov') ||
+        widget.mediaPath.toLowerCase().endsWith('.avi') ||
+        widget.mediaPath.toLowerCase().endsWith('.mkv');
+
+    if (isVideoFile) {
+      _isDynamicVideo = true;
+      _initializeVideoPlayer();
+    }
+  }
+
+  // Add method to handle media path updates (for voice over)
+  void updateMediaPath(String newPath) {
+    // Dispose existing video controller if any
+    _videoController?.dispose();
+    _videoController = null;
+
+    setState(() {
+      _isInitialized = false;
+      _isDynamicVideo = false;
+      _isPlaying = false;
+    });
+
+    // Update the widget's mediaPath reference
+    // Note: You might need to pass this through a callback to parent
+
+    // Check if new path is video
+    final isVideoFile = newPath.toLowerCase().endsWith('.mp4') ||
+        newPath.toLowerCase().endsWith('.mov') ||
+        newPath.toLowerCase().endsWith('.avi') ||
+        newPath.toLowerCase().endsWith('.mkv');
+
+    if (isVideoFile) {
+      _isDynamicVideo = true;
+      // Initialize video player for the new video file
+      _videoController = VideoPlayerController.file(File(newPath))
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() {
+              _isInitialized = true;
+              _videoDuration = _videoController!.value.duration;
+              _endTrim = _videoDuration;
+              _currentPosition = Duration.zero;
+              _startTrim = Duration.zero;
+            });
+
+            _videoController!.addListener(_onVideoPositionChanged);
+            _videoController!.seekTo(Duration.zero);
+
+            // ADDED: Set volume to ensure audio is audible
+            _videoController!.setVolume(1.0);
+
+            print(
+                'Voice over video initialized. Duration: ${_formatDuration(_videoDuration)}');
+          }
+        }).catchError((error) {
+          print('Error initializing video after voice over: $error');
+        });
+    } else {
+      // Handle case where it's still an image (shouldn't happen with voice over)
+      print('Media path updated but not a video file: $newPath');
     }
   }
 
@@ -408,10 +481,13 @@ class PreviewPanelState extends State<PreviewPanel> {
             child: Stack(
               children: [
                 // Media content
-                widget.isVideo ? _buildVideoPreview() : _buildImagePreview(),
+                (widget.isVideo || _isDynamicVideo)
+                    ? _buildVideoPreview()
+                    : _buildImagePreview(),
 
                 // Video controls overlay (only for video)
-                if (widget.isVideo && _isInitialized) _buildVideoControls(),
+                if ((widget.isVideo || _isDynamicVideo) && _isInitialized)
+                  _buildVideoControls(),
 
                 // Overlay items (filtered by time for videos)
                 ..._getVisibleOverlays()
@@ -431,7 +507,7 @@ class PreviewPanelState extends State<PreviewPanel> {
                   ),
 
                 // Video info overlay
-                if (widget.isVideo && _isInitialized)
+                if ((widget.isVideo || _isDynamicVideo) && _isInitialized)
                   Positioned(
                     top: 10,
                     left: 10,
@@ -448,7 +524,9 @@ class PreviewPanelState extends State<PreviewPanel> {
                           Text(
                             '${_formatDuration(_currentPosition)} / ${_formatDuration(_videoDuration)}',
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 12),
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                           if (_playbackSpeed != 1.0)
                             Text(
@@ -480,7 +558,7 @@ class PreviewPanelState extends State<PreviewPanel> {
 
   // Get overlays that should be visible at current time (for video editing)
   List<OverlayItem> _getVisibleOverlays() {
-    if (!widget.isVideo) return _overlayItems;
+    if (!widget.isVideo && !_isDynamicVideo) return _overlayItems;
 
     return _overlayItems.where((item) {
       final startTime = item.startTime ?? Duration.zero;
@@ -488,6 +566,9 @@ class PreviewPanelState extends State<PreviewPanel> {
       return _currentPosition >= startTime && _currentPosition <= endTime;
     }).toList();
   }
+
+  // Add getter for checking if it's currently a video (original or dynamic)
+  bool get isCurrentlyVideo => widget.isVideo || _isDynamicVideo;
 
   Widget _buildVideoControls() {
     return Positioned(
