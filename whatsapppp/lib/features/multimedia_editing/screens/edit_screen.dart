@@ -280,11 +280,11 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         if (!widget.isVideo) {
           await _saveEditedImageToCloud();
         } else {
-          _exportProject();
+          await _saveEditedVideoToCloud();
         }
       },
       tooltip: widget.isVideo ? 'Save Video' : 'Save Image',
-      child: const Icon( Icons.save),
+      child: const Icon(Icons.save),
     );
   }
 
@@ -1099,6 +1099,21 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     try {
       final overlays = _previewPanelKey.currentState?.overlayItems ?? [];
 
+      // Show saving indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Saving video to cloud...'),
+            ],
+          ),
+        ),
+      );
+
       // Use the updated method that handles overlays and blob storage
       final blobId = await _media.saveCurrentEditedImage(
         context: context,
@@ -1146,6 +1161,76 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       }
     } catch (e) {
       showSnackBar(context, 'Failed to save image: $e');
+    }
+  }
+
+  // In edit_screen.dart
+  Future<void> _saveEditedVideoToCloud() async {
+    try {
+      final videoFile = File(widget.mediaPath);
+
+      // Show saving indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Saving video to cloud...'),
+            ],
+          ),
+        ),
+      );
+
+      final blobId =
+          await ref.read(mediaControllerProvider).saveEditedVideoToBlob(
+                videoFile: videoFile,
+                context: context,
+                originalFileName: videoFile.path.split('/').last,
+              );
+
+      // Dismiss saving indicator
+      Navigator.pop(context);
+
+      if (blobId != null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Video Saved Successfully'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                const SizedBox(height: 16),
+                const Text('Your edited video has been saved as blob.'),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Blob ID: $blobId',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _shareProject();
+                },
+                child: const Text('Share'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Dismiss saving indicator
+      showSnackBar(context, 'Failed to save video: $e');
     }
   }
 }

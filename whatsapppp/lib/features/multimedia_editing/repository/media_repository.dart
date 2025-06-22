@@ -323,6 +323,44 @@ class MediaRepository {
     }
   }
 
+  Future<String> saveEditedVideoToBlob({
+    required File editedVideoFile,
+    required String originalFileName,
+    required BuildContext context,
+    String? projectId,
+  }) async {
+    try {
+      final userId = auth.currentUser?.uid ?? 'anonymous';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = projectId != null
+          ? 'project_${projectId}_${timestamp}.mp4'
+          : 'edited_${originalFileName}_${timestamp}.mp4';
+
+      final blobPath = 'media/$userId/edited_videos/$fileName';
+
+      // Store the video file as a blob
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        editedVideoFile,
+        context,
+      );
+
+      // Save metadata to Firestore
+      await _saveVideoMetadataToFirestore(
+        userId: userId,
+        fileName: fileName,
+        blobId: blobId,
+        originalFileName: originalFileName,
+        projectId: projectId,
+        blobPath: blobPath,
+      );
+
+      return blobId;
+    } catch (e) {
+      throw Exception('Failed to save edited video as blob: $e');
+    }
+  }
+
   // UPDATED: Save metadata to Firestore as top-level collection (like users, groups, status)
   Future<void> _saveMediaMetadataToFirestore({
     required String userId,
@@ -334,7 +372,6 @@ class MediaRepository {
     required String blobPath,
   }) async {
     try {
-      // Create data map similar to how user data is saved in AuthRepository
       Map<String, dynamic> mediaData = {
         'userId': userId,
         'fileName': fileName,
@@ -351,21 +388,56 @@ class MediaRepository {
         mediaData['projectId'] = projectId;
       }
 
-      // Save to 'edited_images' collection using document ID pattern like users
-      // Use blobId as document ID to ensure uniqueness
+      // Save to top-level collection only
+      final collection =
+          mediaType == 'image' ? 'edited_images' : 'edited_videos';
+
       await firestore
-          .collection('edited_images') // TOP-LEVEL COLLECTION
-          .doc(blobId) // Use blobId as document ID instead of auto-generated
+          .collection(collection)
+          .doc(blobId)
           .set(mediaData, SetOptions(merge: true));
 
-      print(
-          'Media metadata saved to edited_images collection with doc ID: $blobId');
+      print('Media metadata saved to $collection with ID: $blobId');
     } catch (e) {
       throw Exception('Failed to save media metadata: $e');
     }
   }
 
-// UPDATED: Save editing session to top-level collection
+  Future<void> _saveVideoMetadataToFirestore({
+    required String userId,
+    required String fileName,
+    required String blobId,
+    required String originalFileName,
+    String? projectId,
+    required String blobPath,
+  }) async {
+    try {
+      Map<String, dynamic> videoData = {
+        'userId': userId,
+        'fileName': fileName,
+        'originalFileName': originalFileName,
+        'blobId': blobId,
+        'blobPath': blobPath,
+        'mediaType': 'video',
+        'storageType': 'blob',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (projectId != null) {
+        videoData['projectId'] = projectId;
+      }
+
+      await firestore
+          .collection('edited_videos') // Separate collection for videos
+          .doc(blobId)
+          .set(videoData, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception('Failed to save video metadata: $e');
+    }
+  }
+
+  // UPDATED: Save editing session to top-level collection
   Future<void> saveEditingSession({
     required String sessionId,
     required String mediaType,
@@ -488,33 +560,22 @@ class MediaRepository {
     }
   }
 
-  // NEW: Get all media files for admin/management purposes
-  Stream<List<Map<String, dynamic>>> getAllMediaFiles() {
-    return firestore
-        .collection('edited_images')
-        .orderBy('createdAt', descending: true)
-        .limit(100)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList());
-  }
+  // ADDED: Unified method to get media by type
+  Stream<List<Map<String, dynamic>>> getMediaByType(String mediaType) {
+    final collection = mediaType == 'image' ? 'edited_images' : 'edited_videos';
 
-  // NEW: Get media files by project ID
-  Stream<List<Map<String, dynamic>>> getProjectMediaFiles(String projectId) {
     return firestore
-        .collection('edited_images')
-        .where('projectId', isEqualTo: projectId)
+        .collection(collection)
+        .where('userId', isEqualTo: auth.currentUser!.uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {
+                    'id': doc.id,
+                    ...doc.data(),
+                  })
+              .toList(),
+        );
   }
 }

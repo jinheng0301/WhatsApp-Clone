@@ -287,6 +287,35 @@ class MediaController {
     }
   }
 
+  Future<String?> saveEditedVideoToBlob({
+    required File videoFile,
+    required BuildContext context,
+    String? originalFileName,
+    String? projectId,
+  }) async {
+    try {
+      ref.read(isEditingProvider.notifier).state = true;
+      ref.read(editingProgressProvider.notifier).state = 0.1;
+
+      final blobId = await mediaRepository.saveEditedVideoToBlob(
+        editedVideoFile: videoFile,
+        originalFileName: originalFileName ??
+            'edited_video_${DateTime.now().millisecondsSinceEpoch}.mp4',
+        context: context,
+        projectId: projectId,
+      );
+
+      ref.read(editingProgressProvider.notifier).state = 1.0;
+      return blobId;
+    } catch (e) {
+      showSnackBar(context, 'Failed to save video: $e');
+      return null;
+    } finally {
+      ref.read(isEditingProvider.notifier).state = false;
+      ref.read(editingProgressProvider.notifier).state = 0.0;
+    }
+  }
+
   // UPDATED: Save image with overlays rendered
   Future<String?> saveImageWithOverlays({
     required String originalImagePath,
@@ -520,58 +549,6 @@ class MediaController {
       originalFileName: currentFile.path.split('/').last,
       projectId: projectId,
     );
-  }
-
-  // Save and sharing methods for other media types
-  Future<String?> saveEditedMediaToBlob({
-    required File mediaFile,
-    required String mediaType,
-    required BuildContext context,
-    String? originalFileName,
-    String? projectId,
-  }) async {
-    try {
-      ref.read(isEditingProvider.notifier).state = true;
-      ref.read(editingProgressProvider.notifier).state = 0.1;
-
-      // FIX: Get the actual authenticated user ID
-      final userId = mediaRepository.auth.currentUser?.uid;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
-
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = originalFileName ?? 'edited_media_$timestamp';
-      final blobPath = 'media/$userId/edited_$mediaType/$fileName';
-
-      ref.read(editingProgressProvider.notifier).state = 0.5;
-
-      final blobId = await blobRepository.storeFileAsBlob(
-        blobPath,
-        mediaFile,
-        context,
-      );
-
-      // Save metadata to Firestore using MediaRepository method
-      await mediaRepository.saveEditedMedia(
-        mediaFile: mediaFile,
-        mediaType: mediaType,
-        context: context,
-        originalFileName: originalFileName,
-        projectId: projectId,
-      );
-
-      ref.read(editingProgressProvider.notifier).state = 1.0;
-
-      showSnackBar(context, 'Media saved as blob successfully');
-      return blobId;
-    } catch (e) {
-      showSnackBar(context, 'Failed to save media: ${e.toString()}');
-      return null;
-    } finally {
-      ref.read(isEditingProvider.notifier).state = false;
-      ref.read(editingProgressProvider.notifier).state = 0.0;
-    }
   }
 
   Future<void> saveEditingSession({
