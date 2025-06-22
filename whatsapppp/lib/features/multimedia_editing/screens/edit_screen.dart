@@ -283,8 +283,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           _exportProject();
         }
       },
-      tooltip: widget.isVideo ? 'Export Video' : 'Save Image',
-      child: Icon(widget.isVideo ? Icons.video_call : Icons.save),
+      tooltip: widget.isVideo ? 'Save Video' : 'Save Image',
+      child: const Icon( Icons.save),
     );
   }
 
@@ -344,9 +344,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         ? [
             ('Split', Icons.cut, _showSplitDialog),
             ('Volume', Icons.volume_up, _showVideoVolumeDialog),
-            ('Rotate', Icons.rotate_90_degrees_ccw, () => _rotateVideo(90)),
-            ('Transform', Icons.transform, () {}), // To be implemented
-            ('Animation', Icons.animation, () {}), // To be implemented
             ('Duplicate', Icons.copy, _duplicateVideo),
           ]
         : [
@@ -591,11 +588,50 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       ('Cool', 'cool', Colors.blue.withOpacity(0.3)),
     ];
 
-    return GridView.count(
-      crossAxisCount: 3,
-      children: filters
-          .map((filter) => _filterButton(filter.$1, filter.$2, filter.$3))
-          .toList(),
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: filters.length,
+      itemBuilder: (context, index) {
+        final filter = filters[index];
+        return InkWell(
+          onTap: () {
+            if (filter.$2 != null) {
+              _applyFilter(filter.$2!);
+            }
+            //  _filterButton(filter.$1, filter.$2, filter.$3);
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: filter.$3,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: filter.$2 == 'original'
+                    ? const Icon(Icons.image, size: 20)
+                    : Container(),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                filter.$1,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -616,7 +652,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
 
   Widget _filterButton(String name, String? filter, Color color) {
     return InkWell(
-      onTap: () => _applyFilter(filter),
+      onTap: () => _applyFilter(filter!),
       child: Container(
         margin: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -728,17 +764,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     );
   }
 
-  void _rotateVideo(int degrees) {
-    if (widget.isVideo) return;
-
-    _videoHandler.rotateVideo(
-      context,
-      widget.mediaPath,
-      degrees,
-      (newPath) => setState(() => widget.mediaPath = newPath),
-    );
-  }
-
   void _rotateImage(int degrees) {
     if (widget.isVideo) return;
 
@@ -760,20 +785,42 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     );
   }
 
-  void _applyFilter(String? filter) {
-    if (filter == null || filter == 'original') return;
+  void _applyFilter(String filter) {
+    if (filter == 'original') return;
 
     if (widget.isVideo) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Applying filter to video...'),
+            ],
+          ),
+        ),
+      );
+
       MediaEditorService.applyFilter(
         mediaPath: widget.mediaPath,
         filterType: filter,
         isVideo: true,
       ).then((newPath) {
-        setState(() => widget.mediaPath = newPath);
+        Navigator.pop(context); // Close loading dialog
+        setState(() {
+          widget.mediaPath = newPath;
+        });
         showSnackBar(context, 'Filter "$filter" applied to video');
+      }).catchError((error) {
+        Navigator.pop(context); // Close loading dialog
+        showSnackBar(context, 'Error applying filter: $error');
+        print('Video filter error: $error'); // For debugging
       });
     } else {
-      // Use ImageHandler method instead of inline logic
+      // Use ImageHandler method for images
       _imageHandler.applyFilter(
         context,
         widget.mediaPath,
@@ -785,15 +832,35 @@ class _EditScreenState extends ConsumerState<EditScreen> {
 
   void _applyEffect(String effect) {
     if (widget.isVideo) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Applying effect to video...'),
+            ],
+          ),
+        ),
+      );
+
       MediaEditorService.applyEffect(
         mediaPath: widget.mediaPath,
         effectType: effect,
         isVideo: true,
       ).then((newPath) {
-        setState(() => widget.mediaPath = newPath);
+        Navigator.pop(context); // Close loading dialog
+        setState(() {
+          widget.mediaPath = newPath;
+        });
         showSnackBar(context, 'Effect "$effect" applied to video');
       }).catchError((error) {
+        Navigator.pop(context); // Close loading dialog
         showSnackBar(context, 'Error applying effect: $error');
+        print('Video effect error: $error'); // For debugging
       });
     } else {
       // Use ImageHandler method for images
@@ -984,7 +1051,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    'Ready to export image with ${overlays.length} overlay items'),
+                  'Ready to export image with ${overlays.length} overlay items',
+                ),
                 const SizedBox(height: 16),
                 const Text('Choose export option:'),
               ],

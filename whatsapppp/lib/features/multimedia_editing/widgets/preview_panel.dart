@@ -87,9 +87,13 @@ class PreviewPanelState extends State<PreviewPanel> {
   bool _isDynamicVideo = false;
   // Tracks if image became video due to voice over
 
+  String _currentMediaPath = '';
+  bool _isProcessing = false;
+
   @override
   void initState() {
     super.initState();
+    _currentMediaPath = widget.mediaPath;
     if (widget.isVideo) {
       _initializeVideoPlayer();
     }
@@ -161,6 +165,120 @@ class PreviewPanelState extends State<PreviewPanel> {
     } else {
       // Handle case where it's still an image (shouldn't happen with voice over)
       print('Media path updated but not a video file: $newPath');
+    }
+  }
+
+  Future<void> applyVideoFilter(String filterType) async {
+    if (!isCurrentlyVideo || widget.mediaPath.isEmpty) return;
+
+    try {
+      // Show loading indicator
+      setState(() {
+        _isInitialized = false;
+      });
+
+      // Apply filter using MediaEditorService
+      final newPath = await MediaEditorService.applyFilter(
+        mediaPath: widget.mediaPath,
+        filterType: filterType,
+        isVideo: true,
+      );
+
+      // Dispose current video controller
+      _videoController?.dispose();
+      _videoController = null;
+
+      // Initialize new video with filtered path
+      _videoController = VideoPlayerController.file(File(newPath))
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() {
+              _isInitialized = true;
+              _videoDuration = _videoController!.value.duration;
+              _endTrim = _videoDuration;
+              _currentPosition = Duration.zero;
+              _startTrim = Duration.zero;
+            });
+
+            _videoController!.addListener(_onVideoPositionChanged);
+            _videoController!.seekTo(Duration.zero);
+            _videoController!.setVolume(_volume);
+
+            print('Video filter "$filterType" applied successfully');
+          }
+        }).catchError((error) {
+          print('Error initializing filtered video: $error');
+          setState(() {
+            _isInitialized = true; // Reset to show error state
+          });
+        });
+
+      // Notify parent about path change if needed
+      // You might want to add a callback to notify the parent widget
+      // widget.onVideoPathChanged?.call(newPath);
+    } catch (e) {
+      print('Error applying video filter: $e');
+      setState(() {
+        _isInitialized = true;
+      });
+      // You might want to show an error message to user
+    }
+  }
+
+// Method to apply effect to current video
+  Future<void> applyVideoEffect(String effectType) async {
+    if (!isCurrentlyVideo || widget.mediaPath.isEmpty) return;
+
+    try {
+      // Show loading indicator
+      setState(() {
+        _isInitialized = false;
+      });
+
+      // Apply effect using MediaEditorService
+      final newPath = await MediaEditorService.applyEffect(
+        mediaPath: widget.mediaPath,
+        effectType: effectType,
+        isVideo: true,
+      );
+
+      // Dispose current video controller
+      _videoController?.dispose();
+      _videoController = null;
+
+      // Initialize new video with effect applied
+      _videoController = VideoPlayerController.file(File(newPath))
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() {
+              _isInitialized = true;
+              _videoDuration = _videoController!.value.duration;
+              _endTrim = _videoDuration;
+              _currentPosition = Duration.zero;
+              _startTrim = Duration.zero;
+            });
+
+            _videoController!.addListener(_onVideoPositionChanged);
+            _videoController!.seekTo(Duration.zero);
+            _videoController!.setVolume(_volume);
+
+            print('Video effect "$effectType" applied successfully');
+          }
+        }).catchError((error) {
+          print('Error initializing video with effect: $error');
+          setState(() {
+            _isInitialized = true; // Reset to show error state
+          });
+        });
+
+      // Notify parent about path change if needed
+      // widget.onVideoPathChanged?.call(newPath);
+    } catch (e) {
+      print('Error applying video effect: $e');
+      setState(() {
+        _isInitialized = true;
+      });
+      // You might want to show an error message to user
     }
   }
 
