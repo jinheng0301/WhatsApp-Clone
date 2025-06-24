@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
 import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
-class ImagePreviewHandler {
+class ProfileImagePreviewHandler {
   void showImagePreview(
     BuildContext context,
     WidgetRef ref,
@@ -132,23 +133,17 @@ class ImagePreviewHandler {
 
   void _shareImage(BuildContext context, WidgetRef ref, String blobId) {
     // Implement sharing functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Share functionality to be implemented',
-        ),
-      ),
+    showSnackBar(
+      context,
+      'Share functionality to be implemented',
     );
   }
 
   void _downloadImage(BuildContext context, WidgetRef ref, String blobId) {
     // Implement download functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Download functionality to be implemented',
-        ),
-      ),
+    showSnackBar(
+      context,
+      'Download functionality to be implemented',
     );
   }
 
@@ -211,14 +206,11 @@ class ImagePreviewHandler {
                     await mediaRepository.deleteMediaFile(blobId, userId);
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success
-                            ? 'Image deleted successfully'
-                            : 'Failed to delete image',
-                      ),
-                    ),
+                  showSnackBar(
+                    context,
+                    success
+                        ? 'Image deleted successfully'
+                        : 'Failed to delete image',
                   );
                 }
               }

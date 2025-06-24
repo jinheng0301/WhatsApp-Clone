@@ -1108,11 +1108,13 @@ class _EditScreenState extends ConsumerState<EditScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 16),
-              Text('Saving video to cloud...'),
+              Text('Saving image to cloud...'),
             ],
           ),
         ),
       );
+
+      Navigator.pop(context);
 
       // Use the updated method that handles overlays and blob storage
       final blobId = await _media.saveCurrentEditedImage(
@@ -1183,6 +1185,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           ),
         ),
       );
+
+      Navigator.pop(context);
 
       final blobId =
           await ref.read(mediaControllerProvider).saveEditedVideoToBlob(

@@ -266,17 +266,6 @@ class MediaRepository {
         context,
       );
 
-      // Save metadata to Firestore - UPDATED PATH
-      await _saveMediaMetadataToFirestore(
-        userId: userId,
-        fileName: fileName,
-        blobId: blobId,
-        originalFileName: originalFileName ?? fileName,
-        mediaType: mediaType,
-        projectId: projectId,
-        blobPath: blobPath,
-      );
-
       return blobId;
     } catch (e) {
       throw Exception('Failed to save media: $e');
@@ -306,16 +295,19 @@ class MediaRepository {
         context,
       );
 
-      // Save metadata to Firestore - UPDATED PATH
-      await _saveMediaMetadataToFirestore(
-        userId: userId,
-        fileName: fileName,
-        blobId: blobId,
-        originalFileName: originalFileName,
-        mediaType: 'image',
-        projectId: projectId,
-        blobPath: blobPath,
-      );
+      // IMPORTANT: Create Firestore document with the same ID as blobId
+      await firestore.collection('edited_images').doc(blobId).set({
+        'userId': userId,
+        'fileName': fileName,
+        'blobPath': blobPath,
+        'blobId': blobId,
+        'storageType': 'blob',
+        'mediaType': 'image',
+        'originalFileName': originalFileName,
+        'projectId': projectId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       return blobId;
     } catch (e) {
@@ -345,95 +337,22 @@ class MediaRepository {
         context,
       );
 
-      // Save metadata to Firestore
-      await _saveVideoMetadataToFirestore(
-        userId: userId,
-        fileName: fileName,
-        blobId: blobId,
-        originalFileName: originalFileName,
-        projectId: projectId,
-        blobPath: blobPath,
-      );
+      await firestore.collection('edited_videos').doc(blobId).set({
+        'userId': userId,
+        'fileName': fileName,
+        'blobPath': blobPath,
+        'blobId': blobId,
+        'storageType': 'blob',
+        'mediaType': 'video',
+        'originalFileName': originalFileName,
+        'projectId': projectId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       return blobId;
     } catch (e) {
       throw Exception('Failed to save edited video as blob: $e');
-    }
-  }
-
-  // UPDATED: Save metadata to Firestore as top-level collection (like users, groups, status)
-  Future<void> _saveMediaMetadataToFirestore({
-    required String userId,
-    required String fileName,
-    required String blobId,
-    required String originalFileName,
-    required String mediaType,
-    String? projectId,
-    required String blobPath,
-  }) async {
-    try {
-      Map<String, dynamic> mediaData = {
-        'userId': userId,
-        'fileName': fileName,
-        'originalFileName': originalFileName,
-        'blobId': blobId,
-        'blobPath': blobPath,
-        'mediaType': mediaType,
-        'storageType': 'blob',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (projectId != null) {
-        mediaData['projectId'] = projectId;
-      }
-
-      // Save to top-level collection only
-      final collection =
-          mediaType == 'image' ? 'edited_images' : 'edited_videos';
-
-      await firestore
-          .collection(collection)
-          .doc(blobId)
-          .set(mediaData, SetOptions(merge: true));
-
-      print('Media metadata saved to $collection with ID: $blobId');
-    } catch (e) {
-      throw Exception('Failed to save media metadata: $e');
-    }
-  }
-
-  Future<void> _saveVideoMetadataToFirestore({
-    required String userId,
-    required String fileName,
-    required String blobId,
-    required String originalFileName,
-    String? projectId,
-    required String blobPath,
-  }) async {
-    try {
-      Map<String, dynamic> videoData = {
-        'userId': userId,
-        'fileName': fileName,
-        'originalFileName': originalFileName,
-        'blobId': blobId,
-        'blobPath': blobPath,
-        'mediaType': 'video',
-        'storageType': 'blob',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (projectId != null) {
-        videoData['projectId'] = projectId;
-      }
-
-      await firestore
-          .collection('edited_videos') // Separate collection for videos
-          .doc(blobId)
-          .set(videoData, SetOptions(merge: true));
-    } catch (e) {
-      throw Exception('Failed to save video metadata: $e');
     }
   }
 
@@ -527,20 +446,30 @@ class MediaRepository {
 
   // UPDATED: Get user's media files from top-level collection
   Stream<List<Map<String, dynamic>>> getUserMediaFiles() {
+    final userId = auth.currentUser?.uid;
+    if (userId == null) {
+      return Stream.value(<Map<String, dynamic>>[]);
+    }
+
     return firestore
         .collection('edited_images')
-        .where('userId', isEqualTo: auth.currentUser!.uid)
-        .where('storageType', isEqualTo: 'blob')
-        .orderBy('createdAt', descending: true)
-        .limit(50)
+        .where('userId', isEqualTo: userId)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => {
                     'id': doc.id,
+                    'blobId': doc.id, // Ensure blobId is available
                     ...doc.data(),
                   })
-              .toList(),
+              .toList()
+            // Sort in Dart instead of Firestore to avoid index issues
+            ..sort((a, b) {
+              final aTime = a['createdAt'] as Timestamp?;
+              final bTime = b['createdAt'] as Timestamp?;
+              if (aTime == null || bTime == null) return 0;
+              return bTime.compareTo(aTime); // Descending order
+            }),
         );
   }
 
@@ -562,20 +491,32 @@ class MediaRepository {
 
   // ADDED: Unified method to get media by type
   Stream<List<Map<String, dynamic>>> getMediaByType(String mediaType) {
+    final userId = auth.currentUser?.uid;
+    if (userId == null) {
+      return Stream.value(<Map<String, dynamic>>[]);
+    }
+
     final collection = mediaType == 'image' ? 'edited_images' : 'edited_videos';
 
     return firestore
         .collection(collection)
-        .where('userId', isEqualTo: auth.currentUser!.uid)
-        .orderBy('createdAt', descending: true)
+        .where('userId', isEqualTo: userId)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => {
                     'id': doc.id,
+                    'blobId': doc.id, // Ensure blobId is available
                     ...doc.data(),
                   })
-              .toList(),
+              .toList()
+            // Sort in Dart to avoid Firestore index requirements
+            ..sort((a, b) {
+              final aTime = a['createdAt'] as Timestamp?;
+              final bTime = b['createdAt'] as Timestamp?;
+              if (aTime == null || bTime == null) return 0;
+              return bTime.compareTo(aTime);
+            }),
         );
   }
 }

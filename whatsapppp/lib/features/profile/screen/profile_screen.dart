@@ -7,13 +7,34 @@ import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
-import 'package:whatsapppp/features/profile/function_handler/profile_handler.dart';
+import 'package:whatsapppp/features/profile/function_handler/profile_image_preview_handler.dart';
+
+// Provider to manage the selected tab state ('posts' or 'videos')
+final selectedTabProvider = StateProvider<String>((ref) => 'posts');
 
 // Provider for user's media files
 final userMediaFilesProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   final mediaRepository = ref.watch(mediaRepositoryProvider);
+  final userId = mediaRepository.auth.currentUser?.uid;
+
+  if (userId == null) {
+    return Stream.value(<Map<String, dynamic>>[]);
+  }
+
   return mediaRepository.getUserMediaFiles();
+});
+
+final userVideoFilesProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final mediaRepository = ref.watch(mediaRepositoryProvider);
+  final userId = mediaRepository.auth.currentUser?.uid;
+
+  if (userId == null) {
+    return Stream.value(<Map<String, dynamic>>[]);
+  }
+
+  return mediaRepository.getMediaByType('video');
 });
 
 // Enhanced provider with better debugging
@@ -62,122 +83,196 @@ final blobImageProvider =
   }
 });
 
+final blobVideoProvider =
+    FutureProvider.family<File?, String>((ref, blobId) async {
+  final mediaRepository = ref.watch(mediaRepositoryProvider);
+  final userId = mediaRepository.auth.currentUser?.uid;
+
+  print('🔍 BlobVideoProvider called:');
+  print('   - blobId: $blobId');
+  print('   - userId: $userId');
+
+  if (userId == null) {
+    print('❌ No user ID found');
+    return null;
+  }
+
+  try {
+    // First check if the document exists in Firestore
+    final doc = await mediaRepository.firestore
+        .collection('edited_videos')
+        .doc(blobId)
+        .get();
+
+    print('📄 Firestore document check:');
+    print('   - exists: ${doc.exists}');
+    if (doc.exists && doc.data() != null) {
+      final data = doc.data()!;
+      print('   - blobPath: ${data['blobPath']}');
+      print('   - fileName: ${data['fileName']}');
+      print('   - userId: ${data['userId']}');
+      print('   - storageType: ${data['storageType']}');
+    }
+
+    final result = await mediaRepository.getMediaFileFromBlob(
+      blobId: blobId,
+      userId: userId,
+    );
+
+    print('📁 getMediaFileFromBlob result: ${result?.path ?? 'null'}');
+    return result;
+  } catch (e, stackTrace) {
+    print('💥 BlobVideoProvider error: $e');
+    print('📚 Stack trace: $stackTrace');
+    return null;
+  }
+});
+
 class ProfileScreen extends ConsumerWidget {
   static const String routeName = '/profile-screen';
   const ProfileScreen({super.key});
 
-  final int numOfShortVideos = 0;
-
   Widget _buildStatsSection(WidgetRef ref) {
     return Consumer(
       builder: (context, ref, child) {
-        return ref.watch(userMediaFilesProvider).when(
-              loading: () => const Text('Loading stats...'),
-              error: (err, stackTrace) => const Text('Error loading stats'),
-              data: (mediaFiles) {
-                return Column(
-                  children: [
-                    Text(
-                      mediaFiles.length.toString(),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      'Edited Images',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            // Image counts
+            ref.watch(userMediaFilesProvider).when(
+                  loading: () => const Text('Loading images...'),
+                  error: (err, stackTrace) =>
+                      const Text('Error loading images'),
+                  data: (mediaFiles) {
+                    return Column(
+                      children: [
+                        Text(
+                          mediaFiles.length.toString(),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Text(
+                          'Edited Images',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+            // Videos count
+            ref.watch(userVideoFilesProvider).when(
+                  loading: () => const Text('Loading videos...'),
+                  error: (error, stackTrace) =>
+                      const Text('Error loading videos'),
+                  data: (videoFiles) {
+                    Column(
+                      children: [
+                        Text(
+                          videoFiles.length.toString(),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Text(
+                          'Edited Videos',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        )
+                      ],
+                    );
+
+                    return Container();
+                  },
+                )
+          ],
+        );
       },
     );
   }
 
-  Widget _buildMediaGridSection(WidgetRef ref) {
+  Widget _buildImageGridSection(WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Consumer(
-          builder: (context, ref, child) {
-            return ref.watch(userMediaFilesProvider).when(
-                  loading: () => const Center(
-                    child: Loader(),
-                  ),
-                  error: (err, stackTrace) => Center(
-                    child: ErrorScreen(
-                      error: 'Failed to load images: ${err.toString()}',
-                    ),
-                  ),
-                  data: (mediaFiles) {
-                    if (mediaFiles.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.image_not_supported,
-                                size: 60,
-                                color: Colors.grey,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                'No edited images yet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
+        ref.watch(userMediaFilesProvider).when(
+              loading: () => const Center(
+                child: Loader(),
+              ),
+              error: (err, stackTrace) => Center(
+                child: ErrorScreen(
+                  error: 'Failed to load images: ${err.toString()}',
+                ),
+              ),
+              data: (mediaFiles) {
+                if (mediaFiles.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.image_not_supported,
+                            size: 60,
+                            color: Colors.grey,
                           ),
-                        ),
-                      );
-                    }
-
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 1,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
+                          SizedBox(height: 10),
+                          Text(
+                            'No edited images yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
-                      itemCount: mediaFiles.length,
-                      itemBuilder: (context, index) {
-                        final mediaFile = mediaFiles[index];
-                        final blobId = mediaFile['blobId'] as String;
+                    ),
+                  );
+                }
 
-                        return _buildMediaGridItem(
-                          context: context,
-                          ref: ref,
-                          blobId: blobId,
-                          mediaFile: mediaFile,
-                        );
-                      },
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: mediaFiles.length,
+                  itemBuilder: (context, index) {
+                    final mediaFile = mediaFiles[index];
+                    final blobId = mediaFile['blobId'] as String;
+
+                    return _buildImageGridItem(
+                      context: context,
+                      ref: ref,
+                      blobId: blobId,
+                      mediaFile: mediaFile,
                     );
                   },
                 );
-          },
-        ),
+              },
+            ),
       ],
     );
   }
 
-  Widget _buildMediaGridItem({
+  Widget _buildImageGridItem({
     required BuildContext context,
     required WidgetRef ref,
     required String blobId,
     required Map<String, dynamic> mediaFile,
   }) {
-    final imagePreviewHandler = ImagePreviewHandler();
+    final imagePreviewHandler = ProfileImagePreviewHandler();
 
     return GestureDetector(
       onTap: () => imagePreviewHandler.showImagePreview(
@@ -347,6 +442,256 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildVideoGridSection(WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Consumer(
+          builder: (context, ref, child) {
+            return ref.watch(userVideoFilesProvider).when(
+                  loading: () => const Center(
+                    child: Loader(),
+                  ),
+                  error: (err, stackTrace) => Center(
+                    child: ErrorScreen(
+                      error: 'Failed to load videos: ${err.toString()}',
+                    ),
+                  ),
+                  data: (videoFiles) {
+                    if (videoFiles.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.video_library_outlined,
+                                size: 60,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'No edited videos yet',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 1,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: videoFiles.length,
+                      itemBuilder: (context, index) {
+                        final videoFile = videoFiles[index];
+                        final blobId = videoFile['blobId'] as String;
+
+                        return _buildVideoGridItem(
+                          context: context,
+                          ref: ref,
+                          blobId: blobId,
+                          videoFile: videoFile,
+                        );
+                      },
+                    );
+                  },
+                );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVideoGridItem({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String blobId,
+    required Map<String, dynamic> videoFile,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        // Handle video preview - you can implement video player here
+        print('Video tapped: $blobId');
+        // You might want to navigate to a video player screen
+      },
+      onLongPress: () {
+        // Handle video options (delete, share, etc.)
+        print('Video long pressed: $blobId');
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Consumer(
+            builder: (context, ref, child) {
+              print('🎥 Building video grid item for blobId: $blobId');
+              print('📄 Video file data: $videoFile');
+
+              return ref.watch(blobVideoProvider(blobId)).when(
+                loading: () {
+                  print('⏳ Loading video for blobId: $blobId');
+                  return Container(
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(strokeWidth: 2),
+                          SizedBox(height: 4),
+                          Text(
+                            'Loading...',
+                            style: TextStyle(fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                error: (err, stackTrace) {
+                  print('💥 Error loading video for blobId: $blobId');
+                  print('   Error: $err');
+                  print('   Stack: $stackTrace');
+                  return Container(
+                    color: Colors.red.shade100,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Error',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.red[700],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            err.toString().length > 20
+                                ? '${err.toString().substring(0, 20)}...'
+                                : err.toString(),
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Colors.red[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                data: (videoFile) {
+                  if (videoFile == null) {
+                    print('❌ Video file is null for blobId: $blobId');
+                    print('   This usually means blob retrieval failed');
+
+                    return Container(
+                      color: Colors.orange.shade100,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.video_library_outlined,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Not found',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'ID: ${blobId.length > 8 ? blobId.substring(0, 8) : blobId}...',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  print('✅ Successfully got video file: ${videoFile.path}');
+
+                  // For video thumbnails, you could use video_thumbnail package
+                  // For now, showing a video placeholder with play icon
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        color: Colors.black87,
+                        child: const Center(
+                          child: Icon(
+                            Icons.video_library,
+                            color: Colors.white70,
+                            size: 40,
+                          ),
+                        ),
+                      ),
+                      const Center(
+                        child: Icon(
+                          Icons.play_circle_fill,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '00:00',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -409,7 +754,57 @@ class ProfileScreen extends ConsumerWidget {
                           thickness: 1,
                           height: 40,
                         ),
-                        _buildMediaGridSection(ref)
+                        Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.grid_on),
+                                    onPressed: () {
+                                      print('first button pressed');
+                                      ref
+                                          .read(selectedTabProvider.notifier)
+                                          .state = 'posts';
+                                    },
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.tiktok),
+                                    onPressed: () {
+                                      print('second button pressed');
+                                      ref
+                                          .read(selectedTabProvider.notifier)
+                                          .state = 'videos';
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          ],
+                        ),
+                        Divider(
+                          color: Colors.grey[300],
+                          thickness: 1,
+                          height: 40,
+                        ),
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final selectedTab = ref.watch(selectedTabProvider);
+
+                            if (selectedTab == 'posts') {
+                              return _buildImageGridSection(ref);
+                            } else if (selectedTab == 'videos') {
+                              return _buildVideoGridSection(ref);
+                            }
+
+                            return Container();
+                          },
+                        )
                       ],
                     ),
                   ),

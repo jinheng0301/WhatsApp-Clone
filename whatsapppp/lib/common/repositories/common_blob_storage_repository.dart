@@ -152,12 +152,7 @@ class CommonBlobStorageRepository {
 
       // Store in Firestore
       final base64Image = base64Encode(imageBytes);
-      await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('media')
-          .doc(fileId)
-          .set({
+      await firestore.collection('edited_images').doc(fileId).set({
         'data': base64Image,
         'path': path,
         'contentType': 'image/jpeg',
@@ -165,6 +160,7 @@ class CommonBlobStorageRepository {
         'size': finalSize,
         'originalSize': originalSize,
         'storageType': 'firestore_blob',
+        'userId': userId,
       });
 
       print('BlobRepository: Image stored with ID: $fileId');
@@ -295,18 +291,14 @@ class CommonBlobStorageRepository {
         'isLocalStorage': true,
         'localPath': localPath,
         'storageType': 'local_video',
+        'userId': userId,
       };
 
       if (base64Thumbnail != null) {
         documentData['thumbnail'] = base64Thumbnail;
       }
 
-      await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('media')
-          .doc(fileId)
-          .set(documentData);
+      await firestore.collection('edited_video').doc(fileId).set(documentData);
 
       print('BlobRepository: Video stored with ID: $fileId');
       return fileId;
@@ -430,6 +422,7 @@ class CommonBlobStorageRepository {
             'isCompressed': true,
             'originalSize': originalSize,
             'storageType': 'firestore_blob',
+            'userId': userId,
           };
 
           // Clean up compressed file
@@ -457,18 +450,22 @@ class CommonBlobStorageRepository {
           'localPath': localPath,
           'originalSize': originalSize,
           'storageType': 'local_audio',
+          'userId': userId,
         };
       } else {
         throw Exception('Audio file too large and compression failed');
       }
 
+      // Store in Firestore - determine collection based on content type
+      String collection = 'edited_audio'; // Default for audio
+      if (documentData['contentType'].toString().startsWith('video/')) {
+        collection = 'edited_videos';
+      } else if (documentData['contentType'].toString().startsWith('image/')) {
+        collection = 'edited_images';
+      }
+
       // Store in Firestore
-      await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('media')
-          .doc(fileId)
-          .set(documentData);
+      await firestore.collection(collection).doc(fileId).set(documentData);
 
       print('BlobRepository: Audio stored with ID: $fileId');
       return fileId;
@@ -486,35 +483,24 @@ class CommonBlobStorageRepository {
     try {
       print('BlobRepository: Retrieving blob with ID: $fileId');
 
-      // Try to get from user's media collection
-      final docSnapshot = await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('media')
-          .doc(fileId)
-          .get();
-
       Map<String, dynamic>? data;
 
-      if (!docSnapshot.exists) {
-        print(
-            'BlobRepository: Blob not found in user media, searching globally');
+      // Search in top-level collections first
+      final collections = ['edited_images', 'edited_videos', 'edited_audio'];
 
-        // Fallback: check other users' media collections
-        final querySnapshot = await firestore
-            .collectionGroup('media')
-            .where(FieldPath.documentId, isEqualTo: fileId)
-            .limit(1)
-            .get();
+      for (String collection in collections) {
+        // Try to get from user's media collection
+        final docSnapshot =
+            await firestore.collection(collection).doc(fileId).get();
 
-        if (querySnapshot.docs.isEmpty) {
-          print('BlobRepository: Blob not found anywhere');
-          return null;
+        if (docSnapshot.exists && docSnapshot.data() != null) {
+          final docData = docSnapshot.data()!;
+          // Verify userId matches for security
+          if (docData['userId'] == userId) {
+            data = docData;
+            break;
+          }
         }
-
-        data = querySnapshot.docs.first.data();
-      } else {
-        data = docSnapshot.data();
       }
 
       if (data == null) {
@@ -605,14 +591,22 @@ class CommonBlobStorageRepository {
       final videoDir = Directory('${appDir.path}/videos');
       final audioDir = Directory('${appDir.path}/audio');
 
-      // Get all file IDs from Firestore
-      final allMediaQuery = await firestore
-          .collectionGroup('media')
-          .where('isLocalStorage', isEqualTo: true)
-          .limit(1000) // Limit to prevent memory issues
-          .get();
+      // Get all file IDs from top-level collections
+      final collections = ['edited_images', 'edited_videos', 'edited_audio'];
+      Set<String> validFileIds = {};
 
-      final validFileIds = allMediaQuery.docs.map((doc) => doc.id).toSet();
+      for (String collection in collections) {
+        final querySnapshot = await firestore
+            .collection(collection)
+            .where('isLocalStorage', isEqualTo: true)
+            .limit(1000)
+            .get();
+
+        for (var doc in querySnapshot.docs) {
+          validFileIds.add(doc.id);
+        }
+      }
+
       print('BlobRepository: Found ${validFileIds.length} valid files');
 
       int deletedCount = 0;
