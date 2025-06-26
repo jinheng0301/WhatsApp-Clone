@@ -298,7 +298,7 @@ class CommonBlobStorageRepository {
         documentData['thumbnail'] = base64Thumbnail;
       }
 
-      await firestore.collection('edited_video').doc(fileId).set(documentData);
+      await firestore.collection('edited_videos').doc(fileId).set(documentData);
 
       print('BlobRepository: Video stored with ID: $fileId');
       return fileId;
@@ -479,105 +479,52 @@ class CommonBlobStorageRepository {
   }
 
   // Improved blob retrieval with better memory management
+  // Updated getBlob method
   Future<Uint8List?> getBlob(String fileId, String userId) async {
     try {
-      print('BlobRepository: Retrieving blob with ID: $fileId');
-
-      Map<String, dynamic>? data;
-
-      // Search in top-level collections first
-      final collections = ['edited_images', 'edited_videos', 'edited_audio'];
-
-      for (String collection in collections) {
-        // Try to get from user's media collection
-        final docSnapshot =
-            await firestore.collection(collection).doc(fileId).get();
-
-        if (docSnapshot.exists && docSnapshot.data() != null) {
-          final docData = docSnapshot.data()!;
-          // Verify userId matches for security
-          if (docData['userId'] == userId) {
-            data = docData;
-            break;
-          }
-        }
+      // Always check the correct collections first
+      final imageDoc =
+          await firestore.collection('edited_images').doc(fileId).get();
+      if (imageDoc.exists && imageDoc.data()?['userId'] == userId) {
+        return await _processBlobData(imageDoc.data()!);
       }
 
-      if (data == null) {
-        print('BlobRepository: Invalid blob data');
-        return null;
+      final videoDoc =
+          await firestore.collection('edited_videos').doc(fileId).get();
+      if (videoDoc.exists && videoDoc.data()?['userId'] == userId) {
+        return await _processBlobData(videoDoc.data()!);
       }
 
-      return await _processBlobData(data);
+      print('❌ No blob found for fileId: $fileId');
+      return null;
     } catch (e) {
-      print('BlobRepository: Error retrieving blob: $e');
+      print('💥 Error retrieving blob: $e');
       return null;
     }
   }
 
-  // Enhanced blob data processing with better error handling and memory management
+// Improved blob data processing
   Future<Uint8List?> _processBlobData(Map<String, dynamic> data) async {
     try {
-      // Case 1: Regular blob stored as base64
+      // Handle Firestore BLOBs (base64 encoded)
       if (data.containsKey('data')) {
-        final base64String = data['data'] as String;
-
-        // Check estimated size before decoding
-        final estimatedSize = (base64String.length * 3) ~/ 4;
-        if (estimatedSize > 10 * 1024 * 1024) {
-          // 10MB limit
-          print('BlobRepository: Base64 data too large: $estimatedSize bytes');
-          return null;
-        }
-
-        try {
-          return base64Decode(base64String);
-        } catch (e) {
-          print('BlobRepository: Error decoding base64: $e');
-          return null;
-        }
+        final base64Data = data['data'] as String;
+        return base64Decode(base64Data);
       }
 
-      // Case 2: Video thumbnail
-      else if (data.containsKey('thumbnail')) {
-        final base64Thumbnail = data['thumbnail'] as String;
-        try {
-          return base64Decode(base64Thumbnail);
-        } catch (e) {
-          print('BlobRepository: Error decoding thumbnail: $e');
-          return null;
-        }
-      }
-
-      // Case 3: Local storage reference
-      else if (data.containsKey('localPath')) {
+      // Handle locally stored files
+      if (data.containsKey('localPath')) {
         final localPath = data['localPath'] as String;
         final file = File(localPath);
-
         if (await file.exists()) {
-          try {
-            final fileSize = await file.length();
-            if (fileSize > 10 * 1024 * 1024) {
-              // 10MB limit
-              print('BlobRepository: Local file too large: $fileSize bytes');
-              return null;
-            }
-
-            return await file.readAsBytes();
-          } catch (e) {
-            print('BlobRepository: Error reading local file: $e');
-            return null;
-          }
-        } else {
-          print('BlobRepository: Local file does not exist: $localPath');
-          return null;
+          return await file.readAsBytes();
         }
       }
 
-      print('BlobRepository: Unknown blob data format');
+      print('⚠️ No valid data format found in blob document');
       return null;
     } catch (e) {
-      print('BlobRepository: Error processing blob data: $e');
+      print('💥 Error processing blob data: $e');
       return null;
     }
   }

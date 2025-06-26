@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:whatsapppp/common/utils/color.dart';
 import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
@@ -128,9 +129,40 @@ final blobVideoProvider =
   }
 });
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   static const String routeName = '/profile-screen';
-  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  late PageController pageController;
+  int _page = 0;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    pageController.dispose();
+  }
+
+  void navigationTapped(int page) {
+    pageController.jumpToPage(page);
+  }
+
+  void onPageChanged(int page) {
+    setState(() {
+      _page = page;
+    });
+  }
 
   Widget _buildStatsSection(WidgetRef ref) {
     return Consumer(
@@ -171,7 +203,7 @@ class ProfileScreen extends ConsumerWidget {
                   error: (error, stackTrace) =>
                       const Text('Error loading videos'),
                   data: (videoFiles) {
-                    Column(
+                    return Column(
                       children: [
                         Text(
                           videoFiles.length.toString(),
@@ -189,8 +221,6 @@ class ProfileScreen extends ConsumerWidget {
                         )
                       ],
                     );
-
-                    return Container();
                   },
                 )
           ],
@@ -693,7 +723,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       body: ref.watch(userDataAuthProvider).when(
             loading: () => Loader(),
@@ -762,24 +792,40 @@ class ProfileScreen extends ConsumerWidget {
                                 Container(
                                   padding: EdgeInsets.symmetric(horizontal: 10),
                                   child: IconButton(
-                                    icon: const Icon(Icons.grid_on),
+                                    icon: Icon(
+                                      Icons.grid_on,
+                                      color: _page == 0
+                                          ? primaryColor
+                                          : secondaryColor,
+                                    ),
                                     onPressed: () {
                                       print('first button pressed');
                                       ref
                                           .read(selectedTabProvider.notifier)
                                           .state = 'posts';
+                                      setState(() {
+                                        _page = 0;
+                                      });
                                     },
                                   ),
                                 ),
                                 Container(
                                   padding: EdgeInsets.symmetric(horizontal: 10),
                                   child: IconButton(
-                                    icon: const Icon(Icons.tiktok),
+                                    icon: Icon(
+                                      Icons.tiktok,
+                                      color: _page == 1
+                                          ? primaryColor
+                                          : secondaryColor,
+                                    ),
                                     onPressed: () {
                                       print('second button pressed');
                                       ref
                                           .read(selectedTabProvider.notifier)
                                           .state = 'videos';
+                                      setState(() {
+                                        _page = 1;
+                                      });
                                     },
                                   ),
                                 ),
