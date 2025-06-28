@@ -472,6 +472,7 @@ class ChatRepository {
 
   // SEND FILE MESSAGE
   // This method is used to send files like images, videos, and audio
+  // FIXED: Modified sendFileMessage to save chat files to media subcollection
   void sendFileMessage({
     required BuildContext context,
     required File file,
@@ -494,14 +495,29 @@ class ChatRepository {
 
       String fileId = '';
       try {
-        // Store the file as blob
+        // FIXED: Store the file as blob using a path that indicates it's chat media
+        final chatMediaPath = isGroupChat
+            ? 'chat/${messageEnum.type}/groups/$recieverUserId/$messageId'
+            : 'chat/${messageEnum.type}/${senderUserData.uid}/$recieverUserId/$messageId';
+
         fileId =
             await ref.read(commonBlobStorageRepositoryProvider).storeFileAsBlob(
-                  'chat/${messageEnum.type}/${senderUserData.uid}/$recieverUserId/$messageId',
+                  chatMediaPath,
                   file,
                   context,
                 );
         print('ChatRepository: File stored with ID: $fileId');
+
+        // FIXED: Save chat media metadata to media subcollection
+        await _saveChatMediaToSubcollection(
+          fileId: fileId,
+          senderUserId: senderUserData.uid,
+          recieverUserId: recieverUserId,
+          messageType: messageEnum,
+          filePath: chatMediaPath,
+          isGroupChat: isGroupChat,
+          timeSent: timeSent,
+        );
       } catch (e) {
         print('ChatRepository: Error storing file: $e');
         showSnackBar(context, 'Error uploading file: ${e.toString()}');
@@ -589,6 +605,114 @@ class ChatRepository {
     } catch (e) {
       print('ChatRepository: Error in sendFileMessage: $e');
       showSnackBar(context, 'Failed to send file: ${e.toString()}');
+    }
+  }
+
+  // NEW METHOD: Save chat media metadata to media subcollection
+  Future<void> _saveChatMediaToSubcollection({
+    required String fileId,
+    required String senderUserId,
+    required String recieverUserId,
+    required MessageEnum messageType,
+    required String filePath,
+    required bool isGroupChat,
+    required DateTime timeSent,
+  }) async {
+    try {
+      print('ChatRepository: Saving chat media to subcollection');
+
+      // FIXED: Get the actual blob data from temporary storage
+      final tempMediaDoc =
+          await firestore.collection('temp_chat_media').doc(fileId).get();
+
+      if (!tempMediaDoc.exists || tempMediaDoc.data() == null) {
+        throw Exception('Temporary media data not found for fileId: $fileId');
+      }
+
+      final tempData = tempMediaDoc.data()!;
+      print('ChatRepository: Retrieved temporary media data');
+
+      // FIXED: Prepare complete media data with actual blob content
+      final mediaData = {
+        'fileId': fileId,
+        'senderUserId': senderUserId,
+        'recieverUserId': recieverUserId,
+        'messageType': messageType.name,
+        'filePath': filePath,
+        'isGroupChat': isGroupChat,
+        'timeSent': timeSent,
+        'storageType': 'chat_media',
+        'createdAt': FieldValue.serverTimestamp(),
+        // IMPORTANT: Include the actual base64 data
+        'data': tempData['data'], // This contains the base64 image data
+        'contentType': tempData['contentType'],
+        'size': tempData['size'],
+        'originalSize': tempData['originalSize'],
+      };
+
+      // Save to sender's media subcollection
+      await firestore
+          .collection('users')
+          .doc(senderUserId)
+          .collection('media')
+          .doc(fileId)
+          .set(mediaData);
+
+      print('ChatRepository: Saved to sender media subcollection');
+
+      // Save to receiver's media subcollection (if not group chat)
+      if (!isGroupChat) {
+        await firestore
+            .collection('users')
+            .doc(recieverUserId)
+            .collection('media')
+            .doc(fileId)
+            .set(mediaData);
+
+        print('ChatRepository: Saved to receiver media subcollection');
+      } else {
+        // For group chats, save to all group members' media subcollections
+        try {
+          final groupDoc =
+              await firestore.collection('groups').doc(recieverUserId).get();
+
+          if (groupDoc.exists && groupDoc.data() != null) {
+            final groupData = groupDoc.data()!;
+            final memberUids = List<String>.from(groupData['membersUid'] ?? []);
+
+            // Update media data for group chat
+            final groupMediaData = {
+              ...mediaData,
+              'isGroupChat': true,
+              'groupId': recieverUserId,
+            };
+
+            for (final memberUid in memberUids) {
+              await firestore
+                  .collection('users')
+                  .doc(memberUid)
+                  .collection('media')
+                  .doc(fileId)
+                  .set(groupMediaData);
+            }
+
+            print(
+                'ChatRepository: Saved to all group members media subcollections');
+          }
+        } catch (e) {
+          print('ChatRepository: Error saving to group members: $e');
+        }
+      }
+
+      // FIXED: Clean up temporary storage
+      await firestore.collection('temp_chat_media').doc(fileId).delete();
+
+      print('ChatRepository: Cleaned up temporary storage');
+      print(
+          'ChatRepository: Chat media metadata saved to subcollections successfully');
+    } catch (e) {
+      print('ChatRepository: Error saving chat media metadata: $e');
+      throw e;
     }
   }
 

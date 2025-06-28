@@ -28,8 +28,9 @@ final mediaBlobProvider =
         print('MediaBlobProvider: User ID: ${userData.uid}');
 
         try {
-          // First get the document metadata from user's own collection
-          final userDocSnapshot = await ref
+          // FIRST PRIORITY: Check user's own media subcollection (for chat media)
+          print('MediaBlobProvider: Checking user media subcollection first');
+          final userMediaDoc = await ref
               .read(commonBlobStorageRepositoryProvider)
               .firestore
               .collection('users')
@@ -38,16 +39,58 @@ final mediaBlobProvider =
               .doc(fileId)
               .get();
 
-          if (userDocSnapshot.exists) {
-            final data = userDocSnapshot.data();
-            print('MediaBlobProvider: Found in user collection: ${data?.keys}');
-            return data;
+          if (userMediaDoc.exists && userMediaDoc.data() != null) {
+            final mediaData = userMediaDoc.data()!;
+            print('MediaBlobProvider: Found in user media subcollection');
+            print('MediaBlobProvider: Media data keys: ${mediaData.keys}');
+            print(
+                'MediaBlobProvider: Storage type: ${mediaData['storageType']}');
+
+            // FIXED: For chat media, get the actual blob data from the repository
+            if (mediaData['storageType'] == 'chat_media') {
+              print(
+                  'MediaBlobProvider: This is chat media, getting blob data from repository');
+
+              // Get the actual blob data using the blob repository
+              final blobData = await ref
+                  .read(commonBlobStorageRepositoryProvider)
+                  .getBlob(fileId, userData.uid);
+
+              if (blobData != null) {
+                print(
+                    'MediaBlobProvider: Successfully retrieved blob data: ${blobData.length} bytes');
+
+                // Return the blob data in the expected format
+                return {
+                  'data': base64Encode(blobData),
+                  'contentType': mediaData['messageType'] == 'image'
+                      ? 'image/jpeg'
+                      : mediaData['contentType'] ?? 'image/jpeg',
+                  'storageType': 'chat_media',
+                  'size': blobData.length,
+                  ...mediaData,
+                };
+              } else {
+                print(
+                    'MediaBlobProvider: Failed to retrieve blob data from repository');
+
+                // FALLBACK: Check if the blob data is stored directly in the document
+                print(
+                    'MediaBlobProvider: Checking if data is stored directly in document');
+                if (mediaData.containsKey('data')) {
+                  print('MediaBlobProvider: Found direct data in document');
+                  return mediaData;
+                }
+              }
+            } else {
+              // For non-chat media, return as is
+              return mediaData;
+            }
           }
 
+          // SECOND: Check chat partners' media subcollections
           print(
-              'MediaBlobProvider: Not found in user collection, checking chat partners');
-
-          // Get all chat partners from user's chats collection
+              'MediaBlobProvider: Checking chat partners media subcollections');
           final chatsSnapshot = await ref
               .read(commonBlobStorageRepositoryProvider)
               .firestore
@@ -56,10 +99,10 @@ final mediaBlobProvider =
               .collection('chats')
               .get();
 
-          // Search through each chat partner's media collection
           for (final chatDoc in chatsSnapshot.docs) {
             final chatPartnerId = chatDoc.id;
-            print('MediaBlobProvider: Checking chat partner: $chatPartnerId');
+            print(
+                'MediaBlobProvider: Checking chat partner media: $chatPartnerId');
 
             try {
               final partnerMediaDoc = await ref
@@ -71,20 +114,96 @@ final mediaBlobProvider =
                   .doc(fileId)
                   .get();
 
-              if (partnerMediaDoc.exists) {
-                final data = partnerMediaDoc.data();
+              if (partnerMediaDoc.exists && partnerMediaDoc.data() != null) {
+                final mediaData = partnerMediaDoc.data()!;
                 print(
-                    'MediaBlobProvider: Found in partner collection: ${data?.keys}');
-                return data;
+                    'MediaBlobProvider: Found in partner media subcollection');
+
+                // For chat media, try to get the actual blob data
+                if (mediaData['storageType'] == 'chat_media') {
+                  print(
+                      'MediaBlobProvider: Partner chat media, getting blob data');
+
+                  final blobData = await ref
+                      .read(commonBlobStorageRepositoryProvider)
+                      .getBlob(fileId, chatPartnerId);
+
+                  if (blobData != null) {
+                    print(
+                        'MediaBlobProvider: Successfully retrieved partner blob data: ${blobData.length} bytes');
+
+                    return {
+                      'data': base64Encode(blobData),
+                      'contentType': mediaData['messageType'] == 'image'
+                          ? 'image/jpeg'
+                          : mediaData['contentType'] ?? 'image/jpeg',
+                      'storageType': 'chat_media',
+                      'size': blobData.length,
+                      ...mediaData,
+                    };
+                  } else {
+                    // FALLBACK: Check if data is stored directly in partner's document
+                    if (mediaData.containsKey('data')) {
+                      print(
+                          'MediaBlobProvider: Found direct data in partner document');
+                      return mediaData;
+                    }
+                  }
+                }
+
+                return mediaData;
               }
             } catch (e) {
               print(
                   'MediaBlobProvider: Error checking partner $chatPartnerId: $e');
-              // Continue to next partner
+              continue;
             }
           }
 
-          // Also check groups the user is member of
+          // THIRD: Check top-level collections (for edited media only)
+          print(
+              'MediaBlobProvider: Checking top-level collections for edited media');
+          final collections = [
+            'edited_images',
+            'edited_videos',
+            'edited_audio'
+          ];
+
+          for (String collection in collections) {
+            try {
+              print('MediaBlobProvider: Checking collection: $collection');
+
+              final docSnapshot = await ref
+                  .read(commonBlobStorageRepositoryProvider)
+                  .firestore
+                  .collection(collection)
+                  .doc(fileId)
+                  .get();
+
+              if (docSnapshot.exists && docSnapshot.data() != null) {
+                final docData = docSnapshot.data()!;
+                print('MediaBlobProvider: Found document in $collection');
+                print(
+                    'MediaBlobProvider: Document userId: ${docData['userId']}, requested userId: ${userData.uid}');
+
+                // Verify userId matches for security
+                if (docData['userId'] == userData.uid) {
+                  print(
+                      'MediaBlobProvider: User ID matches, using this document');
+                  return docData;
+                } else {
+                  print('MediaBlobProvider: User ID mismatch, skipping');
+                }
+              }
+            } catch (e) {
+              print(
+                  'MediaBlobProvider: Error checking collection $collection: $e');
+              continue;
+            }
+          }
+
+          // FOURTH: Check groups (if applicable)
+          print('MediaBlobProvider: Checking groups');
           final groupsSnapshot = await ref
               .read(commonBlobStorageRepositoryProvider)
               .firestore
@@ -97,24 +216,61 @@ final mediaBlobProvider =
             print('MediaBlobProvider: Checking group: $groupId');
 
             try {
-              final groupMediaDoc = await ref
-                  .read(commonBlobStorageRepositoryProvider)
-                  .firestore
-                  .collection('groups')
-                  .doc(groupId)
-                  .collection('media')
-                  .doc(fileId)
-                  .get();
+              // Check if any group member has this media
+              final groupData = groupDoc.data();
+              final memberUids =
+                  List<String>.from(groupData['membersUid'] ?? []);
 
-              if (groupMediaDoc.exists) {
-                final data = groupMediaDoc.data();
-                print(
-                    'MediaBlobProvider: Found in group collection: ${data?.keys}');
-                return data;
+              for (final memberUid in memberUids) {
+                final memberMediaDoc = await ref
+                    .read(commonBlobStorageRepositoryProvider)
+                    .firestore
+                    .collection('users')
+                    .doc(memberUid)
+                    .collection('media')
+                    .doc(fileId)
+                    .get();
+
+                if (memberMediaDoc.exists && memberMediaDoc.data() != null) {
+                  final mediaData = memberMediaDoc.data()!;
+                  print(
+                      'MediaBlobProvider: Found in group member media: $memberUid');
+
+                  if (mediaData['storageType'] == 'chat_media' &&
+                      mediaData['isGroupChat'] == true) {
+                    final blobData = await ref
+                        .read(commonBlobStorageRepositoryProvider)
+                        .getBlob(fileId, memberUid);
+
+                    if (blobData != null) {
+                      print(
+                          'MediaBlobProvider: Successfully retrieved group blob data: ${blobData.length} bytes');
+
+                      return {
+                        'data': base64Encode(blobData),
+                        'contentType': mediaData['messageType'] == 'image'
+                            ? 'image/jpeg'
+                            : mediaData['contentType'] ?? 'image/jpeg',
+                        'storageType': 'chat_media',
+                        'size': blobData.length,
+                        ...mediaData,
+                      };
+                    } else {
+                      // FALLBACK: Check if data is stored directly in member's document
+                      if (mediaData.containsKey('data')) {
+                        print(
+                            'MediaBlobProvider: Found direct data in group member document');
+                        return mediaData;
+                      }
+                    }
+                  }
+
+                  return mediaData;
+                }
               }
             } catch (e) {
               print('MediaBlobProvider: Error checking group $groupId: $e');
-              // Continue to next group
+              continue;
             }
           }
 
@@ -451,13 +607,15 @@ class BlobImage extends ConsumerWidget {
         if (estimatedSize > 10 * 1024 * 1024) {
           // 10MB limit
           return _buildErrorWidget(
-              'Image too large (${(estimatedSize / (1024 * 1024)).toStringAsFixed(1)}MB)');
+            'Image too large (${(estimatedSize / (1024 * 1024)).toStringAsFixed(1)}MB)',
+          );
         }
 
         try {
           imageData = base64Decode(base64String);
           print(
-              'BlobImage: Successfully decoded base64, ${imageData.length} bytes');
+            'BlobImage: Successfully decoded base64, ${imageData.length} bytes',
+          );
         } catch (e) {
           print('BlobImage: Error decoding base64: $e');
           return _buildErrorWidget('Invalid base64 data');
@@ -472,7 +630,8 @@ class BlobImage extends ConsumerWidget {
           try {
             imageData = file.readAsBytesSync();
             print(
-                'BlobImage: Successfully read local file, ${imageData.length} bytes');
+              'BlobImage: Successfully read local file, ${imageData.length} bytes',
+            );
           } catch (e) {
             print('BlobImage: Error reading local file: $e');
             return _buildErrorWidget('Cannot read local file');

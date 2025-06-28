@@ -44,6 +44,7 @@ class CommonBlobStorageRepository {
   ) async {
     try {
       print('BlobRepository: Processing file: ${file.path}');
+      print('BlobRepository: Storage path: $path');
 
       // Check if file exists
       if (!await file.exists()) {
@@ -59,21 +60,47 @@ class CommonBlobStorageRepository {
       final fileId = const Uuid().v1();
       final userId = path.split('/')[2]; // Extract user ID from path
 
+      // FIXED: Determine if this is chat media or edited media based on path
+      final isChatMedia = path.startsWith('chat/');
+
+      print('BlobRepository: Is chat media: $isChatMedia');
+
       // Handle based on file type with size checks
       if (contentType.startsWith('video/')) {
         if (fileSize > maxVideoSize) {
           throw Exception(
-              'Video file too large (max ${(maxVideoSize / (1024 * 1024)).toStringAsFixed(1)}MB)');
+            'Video file too large (max ${(maxVideoSize / (1024 * 1024)).toStringAsFixed(1)}MB)',
+          );
         }
-        return await _storeVideoAsBlob(path, file, fileId, userId, context);
+        return await _storeVideoAsBlob(
+          path,
+          file,
+          fileId,
+          userId,
+          context,
+        );
       } else if (contentType.startsWith('audio/')) {
         if (fileSize > maxAudioSize) {
           throw Exception(
-              'Audio file too large (max ${(maxAudioSize / 1024).toStringAsFixed(0)}KB)');
+            'Audio file too large (max ${(maxAudioSize / 1024).toStringAsFixed(0)}KB)',
+          );
         }
-        return await _storeAudioAsBlob(path, file, fileId, userId, context);
+        return await _storeAudioAsBlob(
+          path,
+          file,
+          fileId,
+          userId,
+          context,
+        );
       } else if (contentType.startsWith('image/')) {
-        return await _storeImageAsBlob(path, file, fileId, userId, context);
+        return await _storeImageAsBlob(
+          path,
+          file,
+          fileId,
+          userId,
+          context,
+          isChatMedia,
+        );
       } else {
         throw Exception('Unsupported file type: $contentType');
       }
@@ -93,40 +120,38 @@ class CommonBlobStorageRepository {
     String fileId,
     String userId,
     BuildContext? context,
+    bool isChatMedia, // NEW PARAMETER
   ) async {
     try {
-      print('BlobRepository: Processing image file');
+      print(
+          'BlobRepository: Processing image file (isChatMedia: $isChatMedia)');
 
-      // Read and compress image
+      // Read and compress image (same compression logic as before)
       Uint8List imageBytes = await file.readAsBytes();
       final originalSize = imageBytes.length;
 
-      // If image is too large, compress it
+      // Compression logic remains the same...
       if (originalSize > maxImageSize) {
         print('BlobRepository: Compressing image from $originalSize bytes');
 
-        // Use Flutter's image compression
         final codec = await instantiateImageCodec(
           imageBytes,
-          targetWidth: 800, // Max width
-          targetHeight: 600, // Max height
+          targetWidth: 800,
+          targetHeight: 600,
         );
         final frame = await codec.getNextFrame();
 
-        // Convert back to bytes with JPEG compression
         final byteData =
             await frame.image.toByteData(format: ImageByteFormat.png);
         if (byteData != null) {
           imageBytes = byteData.buffer.asUint8List();
         }
 
-        // If still too large, reduce quality further
         if (imageBytes.length > maxImageSize) {
           final tempDir = await getTemporaryDirectory();
           final tempFile = File('${tempDir.path}/${fileId}_temp.jpg');
           await tempFile.writeAsBytes(imageBytes);
 
-          // Use FFmpeg for more aggressive compression
           final compressedPath = '${tempDir.path}/${fileId}_compressed.jpg';
           final session = await FFmpegKit.execute(
               '-i ${tempFile.path} -q:v 8 -vf "scale=\'min(640,iw)\':\'min(480,ih)\':force_original_aspect_ratio=decrease" $compressedPath');
@@ -150,20 +175,44 @@ class CommonBlobStorageRepository {
         throw Exception('Image still too large after compression');
       }
 
-      // Store in Firestore
       final base64Image = base64Encode(imageBytes);
-      await firestore.collection('edited_images').doc(fileId).set({
-        'data': base64Image,
+
+      // FIXED: Store in different collections based on media type
+      final documentData = {
+        'data': base64Image, // IMPORTANT: Store the actual base64 data here
         'path': path,
         'contentType': 'image/jpeg',
         'createdAt': FieldValue.serverTimestamp(),
         'size': finalSize,
         'originalSize': originalSize,
-        'storageType': 'firestore_blob',
+        'storageType': isChatMedia ? 'chat_media' : 'firestore_blob',
         'userId': userId,
-      });
+      };
 
-      print('BlobRepository: Image stored with ID: $fileId');
+      if (isChatMedia) {
+        // FIXED: For chat media, store the data directly in the document
+        // The ChatRepository will handle saving this to the media subcollection
+        print(
+            'BlobRepository: Chat media data prepared for subcollection storage');
+
+        // Create a temporary storage for chat media that ChatRepository can access
+        // We'll store this temporarily and let ChatRepository move it to the subcollection
+        await firestore
+            .collection('temp_chat_media')
+            .doc(fileId)
+            .set(documentData);
+
+        print('BlobRepository: Temporary chat media stored for processing');
+      } else {
+        // Store edited media in top-level edited_images collection
+        await firestore
+            .collection('edited_images')
+            .doc(fileId)
+            .set(documentData);
+        print('BlobRepository: Edited image stored in top-level collection');
+      }
+
+      print('BlobRepository: Image processed with ID: $fileId');
       return fileId;
     } catch (e) {
       print('BlobRepository: Error storing image: $e');
@@ -480,30 +529,84 @@ class CommonBlobStorageRepository {
 
   // Improved blob retrieval with better memory management
   // Updated getBlob method
+  // FIXED: Modified getBlob method to search in correct collections
   Future<Uint8List?> getBlob(String fileId, String userId) async {
     try {
-      // Always check the correct collections first
-      final imageDoc =
-          await firestore.collection('edited_images').doc(fileId).get();
-      if (imageDoc.exists && imageDoc.data()?['userId'] == userId) {
-        return await _processBlobData(imageDoc.data()!);
+      print(
+        'BlobRepository: Retrieving blob with ID: $fileId for user: $userId',
+      );
+
+      Map<String, dynamic>? data;
+
+      // FIRST: Check if it's a chat media (stored in users/{userId}/media subcollection)
+      try {
+        print('BlobRepository: Checking chat media subcollection');
+
+        final chatMediaSnapshot = await firestore
+            .collection('users')
+            .doc(userId)
+            .collection('media')
+            .doc(fileId)
+            .get();
+
+        if (chatMediaSnapshot.exists && chatMediaSnapshot.data() != null) {
+          final docData = chatMediaSnapshot.data()!;
+          print('BlobRepository: Found document in chat media subcollection');
+          data = docData;
+        }
+      } catch (e) {
+        print('BlobRepository: Error checking chat media subcollection: $e');
       }
 
-      final videoDoc =
-          await firestore.collection('edited_videos').doc(fileId).get();
-      if (videoDoc.exists && videoDoc.data()?['userId'] == userId) {
-        return await _processBlobData(videoDoc.data()!);
+      // SECOND: If not found in chat media, check top-level collections for edited media
+      if (data == null) {
+        final collections = ['edited_images', 'edited_videos', 'edited_audio'];
+
+        for (String collection in collections) {
+          try {
+            print('BlobRepository: Checking collection: $collection');
+
+            final docSnapshot =
+                await firestore.collection(collection).doc(fileId).get();
+
+            if (docSnapshot.exists && docSnapshot.data() != null) {
+              final docData = docSnapshot.data()!;
+              print('BlobRepository: Found document in $collection');
+              print(
+                  'BlobRepository: Document userId: ${docData['userId']}, requested userId: $userId');
+
+              // Verify userId matches for security
+              if (docData['userId'] == userId) {
+                data = docData;
+                print('BlobRepository: User ID matches, using this document');
+                break;
+              } else {
+                print('BlobRepository: User ID mismatch, skipping');
+              }
+            }
+          } catch (e) {
+            print('BlobRepository: Error checking collection $collection: $e');
+            continue;
+          }
+        }
       }
 
-      print('❌ No blob found for fileId: $fileId');
-      return null;
+      if (data == null) {
+        print('BlobRepository: No valid blob data found for fileId: $fileId');
+        return null;
+      }
+
+      print(
+        'BlobRepository: Processing blob data with storageType: ${data['storageType']}',
+      );
+      return await _processBlobData(data);
     } catch (e) {
-      print('💥 Error retrieving blob: $e');
+      print('BlobRepository: Error retrieving blob: $e');
       return null;
     }
   }
 
-// Improved blob data processing
+  // Improved blob data processing
   Future<Uint8List?> _processBlobData(Map<String, dynamic> data) async {
     try {
       // Handle Firestore BLOBs (base64 encoded)
