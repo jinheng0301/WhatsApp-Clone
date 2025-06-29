@@ -124,7 +124,8 @@ class CommonBlobStorageRepository {
   ) async {
     try {
       print(
-          'BlobRepository: Processing image file (isChatMedia: $isChatMedia)');
+        'BlobRepository: Processing image file (isChatMedia: $isChatMedia)',
+      );
 
       // Read and compress image (same compression logic as before)
       Uint8List imageBytes = await file.readAsBytes();
@@ -141,8 +142,9 @@ class CommonBlobStorageRepository {
         );
         final frame = await codec.getNextFrame();
 
-        final byteData =
-            await frame.image.toByteData(format: ImageByteFormat.png);
+        final byteData = await frame.image.toByteData(
+          format: ImageByteFormat.png,
+        );
         if (byteData != null) {
           imageBytes = byteData.buffer.asUint8List();
         }
@@ -154,7 +156,8 @@ class CommonBlobStorageRepository {
 
           final compressedPath = '${tempDir.path}/${fileId}_compressed.jpg';
           final session = await FFmpegKit.execute(
-              '-i ${tempFile.path} -q:v 8 -vf "scale=\'min(640,iw)\':\'min(480,ih)\':force_original_aspect_ratio=decrease" $compressedPath');
+            '-i ${tempFile.path} -q:v 8 -vf "scale=\'min(640,iw)\':\'min(480,ih)\':force_original_aspect_ratio=decrease" $compressedPath',
+          );
 
           final returnCode = await session.getReturnCode();
           if (ReturnCode.isSuccess(returnCode)) {
@@ -177,7 +180,7 @@ class CommonBlobStorageRepository {
 
       final base64Image = base64Encode(imageBytes);
 
-      // FIXED: Store in different collections based on media type
+      // FIXED: Enhanced document data with group chat support
       final documentData = {
         'data': base64Image, // IMPORTANT: Store the actual base64 data here
         'path': path,
@@ -189,11 +192,24 @@ class CommonBlobStorageRepository {
         'userId': userId,
       };
 
+      // FIXED: Add group chat information if it's a group chat
+      if (isChatMedia && path.contains('/groups/')) {
+        // Extract group ID from path: chat/image/groups/{groupId}/{messageId}
+        final pathParts = path.split('/');
+        if (pathParts.length >= 4 && pathParts[2] == 'groups') {
+          final groupId = pathParts[3];
+          documentData['isGroupChat'] = true;
+          documentData['groupId'] = groupId;
+          print('BlobRepository: Added group chat info - groupId: $groupId');
+        }
+      }
+
       if (isChatMedia) {
         // FIXED: For chat media, store the data directly in the document
         // The ChatRepository will handle saving this to the media subcollection
         print(
-            'BlobRepository: Chat media data prepared for subcollection storage');
+          'BlobRepository: Chat media data prepared for subcollection storage',
+        );
 
         // Create a temporary storage for chat media that ChatRepository can access
         // We'll store this temporarily and let ChatRepository move it to the subcollection
