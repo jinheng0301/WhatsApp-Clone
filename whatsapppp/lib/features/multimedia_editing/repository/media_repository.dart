@@ -538,6 +538,16 @@ class MediaRepository {
     }
   }
 
+  Future<bool> deleteVideoFile(String blobId, String userID) async {
+    try {
+      await firestore.collection('edited_videos').doc(blobId).delete();
+      return true;
+    } catch (e) {
+      print('Failed to delete video file: $e');
+      return false;
+    }
+  }
+
   // ADDED: Unified method to get media by type
   Stream<List<Map<String, dynamic>>> getMediaByType(String mediaType) {
     final userId = auth.currentUser?.uid;

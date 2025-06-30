@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player/video_player.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
 import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
-class ProfileImagePreviewHandler {
-  void showImagePreview(
+class ProfileVideoPreviewHandler {
+  void showVideoPreview(
     BuildContext context,
     WidgetRef ref,
     String blobId,
@@ -22,50 +23,63 @@ class ProfileImagePreviewHandler {
             AppBar(
               backgroundColor: Colors.black,
               title: Text(
-                mediaFile['fileName'] ?? 'Image',
+                mediaFile['fileName'] ?? 'Video',
                 style: const TextStyle(color: Colors.white),
               ),
               iconTheme: const IconThemeData(color: Colors.white),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.share),
-                  onPressed: () => _shareImage(context, ref, blobId),
+                  onPressed: () => _shareVideo(context, ref, blobId),
                 ),
                 IconButton(
                   icon: const Icon(Icons.download),
-                  onPressed: () => _downloadImage(context, ref, blobId),
+                  onPressed: () => _downloadVideo(context, ref, blobId),
                 ),
               ],
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16),
                 child: Consumer(
                   builder: (context, ref, child) {
-                    return ref.watch(blobImageProvider(blobId)).when(
+                    return ref.watch(blobVideoProvider(blobId)).when(
                           loading: () => const Center(
                             child: Loader(),
                           ),
                           error: (err, stackTrace) => const Center(
                             child: Text(
-                              'Failed to load image',
+                              'Failed to load video',
                               style: TextStyle(color: Colors.white),
                             ),
                           ),
-                          data: (imageFile) {
-                            if (imageFile == null) {
+                          data: (videoFile) {
+                            if (videoFile == null) {
                               return const Center(
                                 child: Text(
-                                  'Image not found',
+                                  'Video not found',
                                   style: TextStyle(color: Colors.white),
                                 ),
                               );
                             }
 
                             return InteractiveViewer(
-                              child: Image.file(
-                                imageFile,
-                                fit: BoxFit.contain,
+                              child: VideoPlayer(
+                                VideoPlayerController.file(videoFile)
+                                  ..initialize().then((_) {
+                                    // Ensure the first frame is shown after the video is initialized
+                                    // ref
+                                    //         .read(
+                                    //             videoControllerProvider(blobId)
+                                    //                 .notifier)
+                                    //         .state =
+                                    //     VideoPlayerController.file(videoFile);
+                                    // ref
+                                    //     .read(videoControllerProvider(blobId)
+                                    //         .notifier)
+                                    //     .state
+                                    //     .play();
+                                  }),
                               ),
                             );
                           },
@@ -80,7 +94,7 @@ class ProfileImagePreviewHandler {
     );
   }
 
-  void showImageOptions(
+  void showVideoOptions(
     BuildContext context,
     WidgetRef ref,
     String blobId,
@@ -94,36 +108,33 @@ class ProfileImagePreviewHandler {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Share'),
-              onTap: () {
-                Navigator.pop(context);
-                _shareImage(context, ref, blobId);
-              },
+              leading: const Icon(Icons.share, color: Colors.white),
+              title: const Text(
+                'Share',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () => _shareVideo(context, ref, blobId),
             ),
             ListTile(
-              leading: const Icon(Icons.download),
-              title: const Text('Download'),
-              onTap: () {
-                Navigator.pop(context);
-                _downloadImage(context, ref, blobId);
-              },
+              leading: const Icon(Icons.download, color: Colors.white),
+              title: const Text(
+                'Download',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () => _downloadVideo(context, ref, blobId),
             ),
             ListTile(
               leading: const Icon(Icons.info),
               title: const Text('Info'),
-              onTap: () {
-                Navigator.pop(context);
-                _showImageInfo(context, mediaFile);
-              },
+              onTap: () => showVideoInfo(context, mediaFile),
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteImage(context, ref, blobId, mediaFile);
-              },
+              title: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () => _deleteVideo(context, ref, blobId, mediaFile),
             ),
           ],
         ),
@@ -131,7 +142,7 @@ class ProfileImagePreviewHandler {
     );
   }
 
-  void _shareImage(BuildContext context, WidgetRef ref, String blobId) {
+  void _shareVideo(BuildContext context, WidgetRef ref, String blobId) {
     // Implement sharing functionality
     showSnackBar(
       context,
@@ -139,7 +150,7 @@ class ProfileImagePreviewHandler {
     );
   }
 
-  void _downloadImage(BuildContext context, WidgetRef ref, String blobId) {
+  void _downloadVideo(BuildContext context, WidgetRef ref, String blobId) {
     // Implement download functionality
     showSnackBar(
       context,
@@ -147,7 +158,7 @@ class ProfileImagePreviewHandler {
     );
   }
 
-  void _showImageInfo(
+  void showVideoInfo(
     BuildContext context,
     Map<String, dynamic> mediaFile,
   ) {
@@ -155,24 +166,24 @@ class ProfileImagePreviewHandler {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Image Info'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('File Name: ${mediaFile['fileName'] ?? 'Unknown'}'),
-              Text('Original: ${mediaFile['originalFileName'] ?? 'Unknown'}'),
-              Text('Type: ${mediaFile['mediaType'] ?? 'Unknown'}'),
-              Text('Storage: ${mediaFile['storageType'] ?? 'Unknown'}'),
-              if (mediaFile['projectId'] != null)
-                Text('Project: ${mediaFile['projectId']}'),
-              if (mediaFile['createdAt'] != null)
-                Text('Created: ${mediaFile['createdAt'].toDate()}'),
-            ],
+          title: const Text('Video Info'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('File Name: ${mediaFile['fileName'] ?? 'N/A'}'),
+                Text('File Size: ${mediaFile['fileSize'] ?? 'N/A'} bytes'),
+                Text('Duration: ${mediaFile['duration'] ?? 'N/A'} seconds'),
+                Text('Resolution: ${mediaFile['resolution'] ?? 'N/A'}'),
+              ],
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(context);
+              },
               child: const Text('Close'),
             ),
           ],
@@ -181,20 +192,22 @@ class ProfileImagePreviewHandler {
     );
   }
 
-  void _deleteImage(
+  void _deleteVideo(
     BuildContext context,
     WidgetRef ref,
     String blobId,
-    Map<String, dynamic> mediaFile,
+    Map<String, dynamic> videoFile,
   ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Image'),
-        content: const Text('Are you sure you want to delete this image?'),
+        title: const Text('Delete Video'),
+        content: const Text('Are you sure you want to delete this video?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+            },
             child: const Text('Cancel'),
           ),
           TextButton(
@@ -206,14 +219,14 @@ class ProfileImagePreviewHandler {
 
               if (userId != null) {
                 final success =
-                    await mediaRepository.deleteMediaFile(blobId, userId);
+                    await mediaRepository.deleteVideoFile(blobId, userId);
 
                 if (context.mounted) {
                   showSnackBar(
                     context,
                     success
-                        ? 'Image deleted successfully'
-                        : 'Failed to delete image',
+                        ? 'Video deleted successfully'
+                        : 'Failed to delete video',
                   );
                 }
               }

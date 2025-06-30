@@ -9,6 +9,7 @@ import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
 import 'package:whatsapppp/features/profile/function_handler/profile_image_preview_handler.dart';
+import 'package:whatsapppp/features/profile/function_handler/profile_video_preview_handler.dart';
 
 // Provider to manage the selected tab state ('posts' or 'videos')
 final selectedTabProvider = StateProvider<String>((ref) => 'posts');
@@ -550,15 +551,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String blobId,
     required Map<String, dynamic> videoFile,
   }) {
+    final videoPreviewHandler = ProfileVideoPreviewHandler();
+
     return GestureDetector(
       onTap: () {
-        // Handle video preview - you can implement video player here
-        print('Video tapped: $blobId');
-        // You might want to navigate to a video player screen
+        videoPreviewHandler.showVideoPreview(
+          context,
+          ref,
+          blobId,
+          videoFile,
+        );
       },
       onLongPress: () {
-        // Handle video options (delete, share, etc.)
-        print('Video long pressed: $blobId');
+        videoPreviewHandler.showVideoOptions(
+          context,
+          ref,
+          blobId,
+          videoFile,
+        );
       },
       child: Container(
         decoration: BoxDecoration(
