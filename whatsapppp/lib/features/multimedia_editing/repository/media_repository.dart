@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -296,18 +297,21 @@ class MediaRepository {
       );
 
       // IMPORTANT: Create Firestore document with the same ID as blobId
-      await firestore.collection('edited_images').doc(blobId).set({
-        'userId': userId,
-        'fileName': fileName,
-        'blobPath': blobPath,
-        'blobId': blobId,
-        'storageType': 'blob',
-        'mediaType': 'image',
-        'originalFileName': originalFileName,
-        'projectId': projectId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await firestore.collection('edited_images').doc(blobId).set(
+        {
+          'userId': userId,
+          'fileName': fileName,
+          'blobPath': blobPath,
+          'blobId': blobId,
+          'storageType': 'blob',
+          'mediaType': 'image',
+          'originalFileName': originalFileName,
+          'projectId': projectId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       return blobId;
     } catch (e) {
@@ -337,18 +341,21 @@ class MediaRepository {
         context,
       );
 
-      await firestore.collection('edited_videos').doc(blobId).set({
-        'userId': userId,
-        'fileName': fileName,
-        'blobPath': blobPath,
-        'blobId': blobId,
-        'storageType': 'blob',
-        'mediaType': 'video',
-        'originalFileName': originalFileName,
-        'projectId': projectId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await firestore.collection('edited_videos').doc(blobId).set(
+        {
+          'userId': userId,
+          'fileName': fileName,
+          'blobPath': blobPath,
+          'blobId': blobId,
+          'storageType': 'blob',
+          'mediaType': 'video',
+          'originalFileName': originalFileName,
+          'projectId': projectId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       return blobId;
     } catch (e) {
@@ -423,9 +430,50 @@ class MediaRepository {
     String? fileName,
   }) async {
     try {
+      print('MediaRepository: Getting media file for blobId: $blobId');
+
+      // First, try to get the document from Firestore to check if it has base64 data
+      final doc = await firestore.collection('edited_images').doc(blobId).get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        print(
+            'MediaRepository: Found Firestore document with data keys: ${data.keys.toList()}');
+
+        // Check if this document contains base64 data directly
+        if (data.containsKey('data')) {
+          print('MediaRepository: Found base64 data in Firestore document');
+
+          try {
+            // Decode base64 data
+            final base64Data = data['data'] as String;
+            final imageBytes = base64Decode(base64Data);
+
+            // Create temporary file
+            final directory = await getTemporaryDirectory();
+            final tempFileName = fileName ??
+                'blob_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final tempFile = File('${directory.path}/$tempFileName');
+
+            // Write bytes to file
+            await tempFile.writeAsBytes(imageBytes);
+
+            print(
+              'MediaRepository: Successfully created file from base64 data: ${tempFile.path}',
+            );
+            return tempFile;
+          } catch (e) {
+            print('MediaRepository: Error decoding base64 data: $e');
+          }
+        }
+      }
+
+      // Fallback to original blob repository method if no base64 data found
+      print('MediaRepository: Falling back to blob repository');
       final blobData = await blobRepository.getBlob(blobId, userId);
 
       if (blobData == null) {
+        print('MediaRepository: No blob data found');
         return null;
       }
 
@@ -436,10 +484,11 @@ class MediaRepository {
       final tempFile = File('${directory.path}/$tempFileName');
 
       await tempFile.writeAsBytes(blobData);
+      print('MediaRepository: Created file from blob data: ${tempFile.path}');
 
       return tempFile;
     } catch (e) {
-      print('Failed to get media file from blob: $e');
+      print('MediaRepository: Failed to get media file from blob: $e');
       return null;
     }
   }
