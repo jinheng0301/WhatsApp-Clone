@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -11,7 +12,9 @@ import 'package:whatsapppp/common/providers/message_reply_provider.dart';
 import 'package:whatsapppp/common/utils/color.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/features/chat/controller/chat_controller.dart';
+import 'package:whatsapppp/features/chat/widgets/edited_image_picker.dart';
 import 'package:whatsapppp/features/chat/widgets/message_reply_preview.dart';
+import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
 
 class BottomChatField extends ConsumerStatefulWidget {
   late final String receiverUserId;
@@ -28,6 +31,7 @@ class BottomChatField extends ConsumerStatefulWidget {
 
 class _BottomChatFieldState extends ConsumerState<BottomChatField> {
   final TextEditingController messageController = TextEditingController();
+  final authUser = FirebaseAuth.instance.currentUser?.uid;
   FlutterSoundRecorder? soundRecorder;
   bool isShowSendButton = false;
   bool isRecorderInit = false;
@@ -174,6 +178,32 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     }
   }
 
+  void selectEditedImage() async {
+    showModalBottomSheet(
+        context: context,
+        builder: (context) {
+          return EditedImagePicker(
+            onImageSelected: (String blobId) async {
+              Navigator.pop(context);
+              // Get the edited image file from blob storage
+              final mediaRepo = ref.read(mediaRepositoryProvider);
+              final userId = authUser ?? '';
+
+              File? editedImageFile = await mediaRepo.getMediaFileFromBlob(
+                blobId: blobId,
+                userId: userId,
+              );
+
+              if (editedImageFile != null) {
+                sendFileMessage(editedImageFile, MessageEnum.image);
+              } else {
+                showSnackBar(context, 'Failed to load edited image');
+              }
+            },
+          );
+        });
+  }
+
   void selectVideo() async {
     File? video = await pickVideoFromGallery(context);
     if (video != null) {
@@ -241,7 +271,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
 
     return Column(
       children: [
-        isShowMessageReply ? MessageReplyPreview() : SizedBox(),
+        isShowMessageReply ? const MessageReplyPreview() : const SizedBox(),
         Row(
           children: [
             Expanded(
@@ -299,6 +329,13 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                           ),
                         ),
                         IconButton(
+                          onPressed: selectEditedImage,
+                          icon: const Icon(
+                            Icons.edit,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        IconButton(
                           onPressed: selectVideo,
                           icon: const Icon(
                             Icons.attach_file,
@@ -329,7 +366,8 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                 left: 2,
               ),
               child: CircleAvatar(
-                backgroundColor: isRecording ? Colors.red : Color(0xFF128C7E),
+                backgroundColor:
+                    isRecording ? Colors.red : const Color(0xFF128C7E),
                 radius: 25,
                 child: InkWell(
                   onTap: sendTextMessage,
@@ -364,7 +402,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                   },
                 ),
               )
-            : SizedBox(),
+            : const SizedBox(),
       ],
     );
   }
