@@ -162,6 +162,7 @@ class _TrimmerDialogState extends State<TrimmerDialog> {
 }
 
 // Main EditScreen - Significantly reduced
+// ignore: must_be_immutable
 class EditScreen extends ConsumerStatefulWidget {
   String mediaPath;
   final bool isVideo;
@@ -185,6 +186,7 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   final GlobalKey<PreviewPanelState> _previewPanelKey =
       GlobalKey<PreviewPanelState>();
   final _toolTabs = ['Edit', 'Text', 'Audio', 'Effects', 'Filters'];
+  // ignore: unused_field
   List<OverlayItem> _currentOverlays = [];
 
   // Handler instances
@@ -646,37 +648,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           const SizedBox(height: 4),
           Text(label, style: const TextStyle(fontSize: 12))
         ],
-      ),
-    );
-  }
-
-  Widget _filterButton(String name, String? filter, Color color) {
-    return InkWell(
-      onTap: () => _applyFilter(filter!),
-      child: Container(
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: const TextStyle(fontSize: 10),
-            ),
-          ],
-        ),
       ),
     );
   }
