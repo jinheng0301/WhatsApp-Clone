@@ -176,6 +176,14 @@ class ProfileVideoPreviewHandler {
                 Text('File Size: ${mediaFile['fileSize'] ?? 'N/A'} bytes'),
                 Text('Duration: ${mediaFile['duration'] ?? 'N/A'} seconds'),
                 Text('Resolution: ${mediaFile['resolution'] ?? 'N/A'}'),
+                if (mediaFile['mediaType'] != null) ...[
+                  Text('Media Type: ${mediaFile['mediaType']}'),
+                ],
+                if (mediaFile['createdAt'] != null) ...[
+                  Text(
+                    'Created At: ${mediaFile['createdAt'].toDate() ?? 'N/A'}',
+                  ),
+                ],
               ],
             ),
           ),
