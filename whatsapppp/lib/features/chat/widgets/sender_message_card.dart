@@ -15,6 +15,9 @@ class SenderMessageCard extends StatelessWidget {
   late final bool isGroupChat;
   late final String? senderProfilePic;
   late final String? senderName;
+  late final String senderUid;
+  late final String phoneNumber;
+  late final String email;
 
   SenderMessageCard({
     required this.message,
@@ -24,6 +27,9 @@ class SenderMessageCard extends StatelessWidget {
     required this.repliedText,
     required this.username,
     required this.repliedMessageType,
+    required this.senderUid,
+    required this.phoneNumber,
+    required this.email,
     this.isGroupChat = false,
     this.senderProfilePic,
     this.senderName,
@@ -45,6 +51,84 @@ class SenderMessageCard extends StatelessWidget {
     // Use the hash code to consistently assign colors
     final index = name.hashCode.abs() % colors.length;
     return colors[index];
+  }
+
+  Future<void> _showProfilePreviewDialog(BuildContext context) async {
+    return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.grey[300],
+                  backgroundImage:
+                      senderProfilePic != null && senderProfilePic!.isNotEmpty
+                          ? NetworkImage(senderProfilePic!)
+                          : null,
+                  child: senderProfilePic == null || senderProfilePic!.isEmpty
+                      ? Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.grey[600],
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  senderName ?? 'Unknown User',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    const Icon(Icons.phone, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        phoneNumber.isNotEmpty ? phoneNumber : 'Not provided',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Email
+                Row(
+                  children: [
+                    const Icon(Icons.email, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        email.isNotEmpty ? email : 'Not provided',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        });
   }
 
   @override
@@ -70,20 +154,27 @@ class SenderMessageCard extends StatelessWidget {
               children: [
                 // Profile picture for group chats
                 if (isGroupChat) ...[
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage:
-                        senderProfilePic != null && senderProfilePic!.isNotEmpty
-                            ? NetworkImage(senderProfilePic!)
-                            : null,
-                    child: senderProfilePic == null || senderProfilePic!.isEmpty
-                        ? Icon(
-                            Icons.person,
-                            size: 20,
-                            color: Colors.grey[600],
-                          )
-                        : null,
+                  GestureDetector(
+                    onTap: () {
+                      // Create a simple profile preview dialog instead of navigating
+                      _showProfilePreviewDialog(context);
+                    },
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: senderProfilePic != null &&
+                              senderProfilePic!.isNotEmpty
+                          ? NetworkImage(senderProfilePic!)
+                          : null,
+                      child:
+                          senderProfilePic == null || senderProfilePic!.isEmpty
+                              ? Icon(
+                                  Icons.person,
+                                  size: 20,
+                                  color: Colors.grey[600],
+                                )
+                              : null,
+                    ),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -135,7 +226,7 @@ class SenderMessageCard extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: backgroundColor.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border(
+                                    border: const Border(
                                       left: BorderSide(
                                         color: Colors.white70,
                                         width: 3,

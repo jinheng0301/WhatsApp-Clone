@@ -67,7 +67,8 @@ class _ChatListState extends ConsumerState<ChatList> {
     }
   }
 
-  Future<String?> _getSenderProfilePic(String senderId) async {
+  // Updated method to get complete user data
+  Future<UserModel?> _getSenderUserData(String senderId) async {
     try {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -75,28 +76,10 @@ class _ChatListState extends ConsumerState<ChatList> {
           .get();
 
       if (userDoc.exists && userDoc.data() != null) {
-        final userData = UserModel.fromMap(userDoc.data()!);
-        return userData.profilePic;
+        return UserModel.fromMap(userDoc.data()!);
       }
     } catch (e) {
-      print('Error getting sender profile pic: $e');
-    }
-    return null;
-  }
-
-  Future<String?> _getSenderName(String senderId) async {
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(senderId)
-          .get();
-
-      if (userDoc.exists && userDoc.data() != null) {
-        final userData = UserModel.fromMap(userDoc.data()!);
-        return userData.name;
-      }
-    } catch (e) {
-      print('Error getting sender name: $e');
+      print('Error getting sender user data: $e');
     }
     return null;
   }
@@ -183,19 +166,11 @@ class _ChatListState extends ConsumerState<ChatList> {
 
             // If the message is not sent by the current user, it's from the other user
             if (widget.isGroupChat) {
-              return FutureBuilder(
-                future: Future.wait([
-                  _getSenderProfilePic(messageData.senderId),
-                  _getSenderName(messageData.senderId),
-                ]),
-                builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-                  String? profilePic;
-                  String? senderName;
-                  if (snapshot.connectionState == ConnectionState.done &&
-                      snapshot.hasData) {
-                    profilePic = snapshot.data![0] as String?;
-                    senderName = snapshot.data![1] as String?;
-                  }
+              return FutureBuilder<UserModel?>(
+                future: _getSenderUserData(messageData.senderId),
+                builder: (context, AsyncSnapshot<UserModel?> snapshot) {
+                  UserModel? senderUser = snapshot.data;
+
                   return SenderMessageCard(
                     message: messageData.text,
                     date: timeSent,
@@ -209,27 +184,40 @@ class _ChatListState extends ConsumerState<ChatList> {
                     ),
                     repliedText: messageData.repliedMessage,
                     isGroupChat: widget.isGroupChat,
-                    senderProfilePic: profilePic,
-                    senderName: senderName,
+                    senderProfilePic: senderUser?.profilePic,
+                    senderName: senderUser?.name,
+                    senderUid: messageData.senderId,
+                    phoneNumber: senderUser?.phoneNumber ?? '',
+                    email: senderUser?.email ?? '',
                   );
                 },
               );
             } else {
-              return SenderMessageCard(
-                message: messageData.text,
-                date: timeSent,
-                type: messageData.type,
-                username: messageData.repliedTo,
-                repliedMessageType: messageData.repliedMessageType,
-                onRightSwipe: (details) => onMessageSwipe(
-                  messageData.text,
-                  false,
-                  messageData.type,
-                ),
-                repliedText: messageData.repliedMessage,
-                isGroupChat: widget.isGroupChat,
-                senderProfilePic: null,
-                senderName: null,
+              return FutureBuilder<UserModel?>(
+                future: _getSenderUserData(messageData.senderId),
+                builder: (context, AsyncSnapshot<UserModel?> snapshot) {
+                  UserModel? senderUser = snapshot.data;
+
+                  return SenderMessageCard(
+                    message: messageData.text,
+                    date: timeSent,
+                    type: messageData.type,
+                    username: messageData.repliedTo,
+                    repliedMessageType: messageData.repliedMessageType,
+                    onRightSwipe: (details) => onMessageSwipe(
+                      messageData.text,
+                      false,
+                      messageData.type,
+                    ),
+                    repliedText: messageData.repliedMessage,
+                    isGroupChat: widget.isGroupChat,
+                    senderProfilePic: senderUser?.profilePic,
+                    senderName: senderUser?.name,
+                    senderUid: messageData.senderId,
+                    phoneNumber: senderUser?.phoneNumber ?? '',
+                    email: senderUser?.email ?? '',
+                  );
+                },
               );
             }
           },

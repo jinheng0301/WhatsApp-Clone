@@ -736,7 +736,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: ref.watch(userDataAuthProvider).when(
-            loading: () => Loader(),
+            loading: () => const Loader(),
             error: (err, stackTrace) {
               return ErrorScreen(error: err.toString());
             },
@@ -761,33 +761,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             width: 100,
                           ),
                         ),
-                        SizedBox(height: 20),
+                        const SizedBox(height: 20),
                         Column(
                           children: [
                             Text(
                               user?.name ?? 'No Name',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               user?.email ?? 'No email available',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
                                 color: Colors.grey,
                               ),
                             ),
                             Text(
                               user?.phoneNumber ?? 'No phone number',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
                                 color: Colors.grey,
                               ),
                             )
                           ],
                         ),
-                        SizedBox(height: 15),
+                        const SizedBox(height: 15),
                         _buildStatsSection(ref),
                         Divider(
                           color: Colors.grey[300],
@@ -800,7 +800,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
                                   child: IconButton(
                                     icon: Icon(
                                       Icons.grid_on,
@@ -820,7 +820,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                 ),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
                                   child: IconButton(
                                     icon: Icon(
                                       Icons.tiktok,
