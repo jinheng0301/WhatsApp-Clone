@@ -9,6 +9,7 @@ import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/features/group/screens/create_group_screen.dart';
 import 'package:whatsapppp/features/landing/screens/landing_screen.dart';
 import 'package:whatsapppp/features/multimedia_editing/screens/new_project_screen.dart';
+import 'package:whatsapppp/features/profile/screen/other_user_profile_screen.dart';
 import 'package:whatsapppp/features/select_contacts/screens/select_contact_screens.dart';
 import 'package:whatsapppp/features/status/screens/confirm_status_screen.dart';
 import 'package:whatsapppp/features/status/screens/status_screen.dart';
@@ -109,12 +110,25 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
         builder: (_) => ProfileScreen(),
       );
 
+    //OTHER USER PROFILE SCREEN
+    case OtherUserProfileScreen.routeName:
+      final args = settings.arguments as Map<String, dynamic>;
+      return MaterialPageRoute(
+        builder: (context) => OtherUserProfileScreen(
+          userId: args['userId'] as String,
+          userName: args['userName'] as String,
+          userProfilePic: args['userProfilePic'] as String?,
+          phoneNumber: args['phoneNumber'] as String,
+          email: args['email'] as String,
+        ),
+      );
+
     // NEW PROJECT SCREEN
     case NewProjectScreen.routeName:
       return MaterialPageRoute(
         builder: (_) => NewProjectScreen(),
       );
-    
+
     // ERROR SCREEN
     default:
       return MaterialPageRoute(

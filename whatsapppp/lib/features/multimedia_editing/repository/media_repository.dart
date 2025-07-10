@@ -522,6 +522,37 @@ class MediaRepository {
         );
   }
 
+  Stream<List<Map<String, dynamic>>> getUserMediaFilesByUserId(String userId) {
+    return firestore
+        .collection('edited_images')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['blobId'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+// Get video files for a specific user
+  Stream<List<Map<String, dynamic>>> getUserVideoFilesByUserId(String userId) {
+    return firestore
+        .collection('edited_videos')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['blobId'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
   // UPDATED: Delete media file using document ID
   Future<bool> deleteMediaFile(String blobId, String userId) async {
     try {
