@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
@@ -99,7 +100,12 @@ class ProfileVideoPreviewHandler {
     WidgetRef ref,
     String blobId,
     Map<String, dynamic> mediaFile,
+    String? mediaOwnerId,
   ) {
+    // Check if current user is the owner of the media
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final isOwner = mediaOwnerId == null || currentUserId == mediaOwnerId;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -128,14 +134,16 @@ class ProfileVideoPreviewHandler {
               title: const Text('Info'),
               onTap: () => showVideoInfo(context, mediaFile),
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
+            if (isOwner) ...[
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () => _deleteVideo(context, ref, blobId, mediaFile),
               ),
-              onTap: () => _deleteVideo(context, ref, blobId, mediaFile),
-            ),
+            ],
           ],
         ),
       ),

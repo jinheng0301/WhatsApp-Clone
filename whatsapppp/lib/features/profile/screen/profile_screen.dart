@@ -317,6 +317,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ref,
         blobId,
         mediaFile,
+        null,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -568,6 +569,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ref,
           blobId,
           videoFile,
+          null
         );
       },
       child: Container(
@@ -800,7 +802,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
                                   child: IconButton(
                                     icon: Icon(
                                       Icons.grid_on,
@@ -820,7 +823,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
                                   child: IconButton(
                                     icon: Icon(
                                       Icons.tiktok,

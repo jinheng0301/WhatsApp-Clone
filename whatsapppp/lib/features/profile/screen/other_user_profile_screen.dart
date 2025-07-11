@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
@@ -8,7 +11,6 @@ import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
 import 'package:whatsapppp/features/profile/function_handler/profile_image_preview_handler.dart';
 import 'package:whatsapppp/features/profile/function_handler/profile_video_preview_handler.dart';
-import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 import 'package:whatsapppp/models/user_model.dart';
 
 // Provider for other user's media files
@@ -29,6 +31,32 @@ final otherUserDataProvider =
     StreamProvider.family<UserModel, String>((ref, userId) {
   final authController = ref.watch(authControllerProvider);
   return authController.userDataById(userId);
+});
+
+final blobImageProvider =
+    FutureProvider.family<File?, String>((ref, blobId) async {
+  final mediaRepository = ref.watch(mediaRepositoryProvider);
+  // Get current user's ID for the blob retrieval
+  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  if (currentUserId == null) return null;
+
+  return await mediaRepository.getMediaFileFromBlob(
+    blobId: blobId,
+    userId: currentUserId, // Use current user's ID for blob access
+  );
+});
+
+final blobVideoProvider =
+    FutureProvider.family<File?, String>((ref, blobId) async {
+  final mediaRepository = ref.watch(mediaRepositoryProvider);
+  // Get current user's ID for the blob retrieval
+  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  if (currentUserId == null) return null;
+
+  return await mediaRepository.getMediaFileFromBlob(
+    blobId: blobId,
+    userId: currentUserId, // Use current user's ID for blob access
+  );
 });
 
 class OtherUserProfileScreen extends ConsumerStatefulWidget {
@@ -191,7 +219,7 @@ class _OtherUserProfileScreenState
     required WidgetRef ref,
     required String blobId,
     required Map<String, dynamic> mediaFile,
-    required String userId, // Add userId parameter
+    required String userId,
   }) {
     final imagePreviewHandler = ProfileImagePreviewHandler();
 
@@ -207,6 +235,7 @@ class _OtherUserProfileScreenState
         ref,
         blobId,
         mediaFile,
+        userId,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -218,135 +247,53 @@ class _OtherUserProfileScreenState
           child: Consumer(
             builder: (context, ref, child) {
               print(
-                  '🖼️ Building grid item for blobId: $blobId (userId: $userId)');
+                '🖼️ Building grid item for blobId: $blobId (userId: $userId)',
+              );
               print('📄 Media file data: $mediaFile');
 
               return ref.watch(blobImageProvider(blobId)).when(
-                loading: () {
-                  print('⏳ Loading image for blobId: $blobId');
-                  return Container(
-                    color: Colors.grey.shade200,
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(strokeWidth: 2),
-                          SizedBox(height: 4),
-                          Text(
-                            'Loading...',
-                            style: TextStyle(fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                error: (err, stackTrace) {
-                  print('💥 Error loading image for blobId: $blobId');
-                  print('   Error: $err');
-                  print('   Stack: $stackTrace');
-                  return Container(
-                    color: Colors.red.shade100,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.error,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Error',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.red[700],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            err.toString().length > 20
-                                ? '${err.toString().substring(0, 20)}...'
-                                : err.toString(),
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Colors.red[600],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                data: (imageFile) {
-                  if (imageFile == null) {
-                    print('❌ Image file is null for blobId: $blobId');
-                    print('   This usually means blob retrieval failed');
-
-                    // Show debug info in the UI
-                    return Container(
-                      color: Colors.orange.shade100,
-                      child: Center(
+                    loading: () => Container(
+                      color: Colors.grey.shade200,
+                      child: const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.image_not_supported,
-                              color: Colors.orange,
-                              size: 20,
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Not found',
-                              style: TextStyle(fontSize: 10),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'ID: ${blobId.length > 8 ? blobId.substring(0, 8) : blobId}...',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            CircularProgressIndicator(strokeWidth: 2),
+                            SizedBox(height: 4),
+                            Text('Loading...', style: TextStyle(fontSize: 10)),
                           ],
                         ),
                       ),
-                    );
-                  }
-
-                  print('✅ Successfully got image file: ${imageFile.path}');
-                  return Image.file(
-                    imageFile,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (context, error, stackTrace) {
-                      print(
-                        '💥 Image.file error for ${imageFile.path}: $error',
-                      );
+                    ),
+                    error: (err, stackTrace) {
+                      print('💥 Error loading image for blobId: $blobId');
+                      print('   Error: $err');
                       return Container(
-                        color: Colors.yellow.shade100,
+                        color: Colors.red.shade100,
                         child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.broken_image,
-                                color: Colors.orange,
+                                Icons.error,
+                                color: Colors.red,
                                 size: 20,
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Broken',
-                                style: TextStyle(fontSize: 10),
-                              ),
                               Text(
-                                error.toString().length > 15
-                                    ? '${error.toString().substring(0, 15)}...'
-                                    : error.toString(),
-                                style: const TextStyle(fontSize: 8),
+                                'Error',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.red[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tap to retry',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Colors.red[600],
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -354,9 +301,64 @@ class _OtherUserProfileScreenState
                         ),
                       );
                     },
+                    data: (imageFile) {
+                      if (imageFile == null) {
+                        return Container(
+                          color: Colors.orange.shade100,
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.orange,
+                                  size: 20,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Not found',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Image.file(
+                        imageFile,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.yellow.shade100,
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Broken',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   );
-                },
-              );
             },
           ),
         ),
@@ -462,6 +464,7 @@ class _OtherUserProfileScreenState
           ref,
           blobId,
           videoFile,
+          userId,
         );
       },
       child: Container(
@@ -630,11 +633,11 @@ class _OtherUserProfileScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: AppBar(
-      //   title: Text(widget.userName),
-      //   backgroundColor: primaryColor,
-      //   elevation: 0,
-      // ),
+      appBar: AppBar(
+        title: Text(widget.userName),
+        backgroundColor: appBarColor,
+        elevation: 0,
+      ),
       body: ref.watch(otherUserDataProvider(widget.userId)).when(
             loading: () => const Center(child: Loader()),
             error: (err, stackTrace) {
@@ -749,7 +752,7 @@ class _OtherUserProfileScreenState
                                   const EdgeInsets.symmetric(horizontal: 10),
                               child: IconButton(
                                 icon: Icon(
-                                  Icons.video_library,
+                                  Icons.tiktok,
                                   color: _selectedTab == 1
                                       ? primaryColor
                                       : secondaryColor,

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
@@ -85,7 +86,12 @@ class ProfileImagePreviewHandler {
     WidgetRef ref,
     String blobId,
     Map<String, dynamic> mediaFile,
+    String? mediaOwnerId,
   ) {
+    // Check if current user is the owner of the media
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final isOwner = mediaOwnerId == null || currentUserId == mediaOwnerId;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -117,14 +123,17 @@ class ProfileImagePreviewHandler {
                 _showImageInfo(context, mediaFile);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteImage(context, ref, blobId, mediaFile);
-              },
-            ),
+            if (isOwner) ...[
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteImage(context, ref, blobId, mediaFile);
+                },
+              ),
+            ],
           ],
         ),
       ),

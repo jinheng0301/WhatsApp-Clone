@@ -424,6 +424,7 @@ class MediaRepository {
   }
 
   // Get media by blob ID
+  // Update getMediaFileFromBlob method to handle cross-user access:
   Future<File?> getMediaFileFromBlob({
     required String blobId,
     required String userId,
@@ -432,11 +433,17 @@ class MediaRepository {
     try {
       print('MediaRepository: Getting media file for blobId: $blobId');
 
-      // First, try to get the document from Firestore to check if it has base64 data
-      final doc = await firestore.collection('edited_images').doc(blobId).get();
+      // Try to get from edited_images first
+      DocumentSnapshot doc =
+          await firestore.collection('edited_images').doc(blobId).get();
+
+      // If not found in images, try videos
+      if (!doc.exists) {
+        doc = await firestore.collection('edited_videos').doc(blobId).get();
+      }
 
       if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
+        final data = doc.data()! as Map<String, dynamic>;
         print(
             'MediaRepository: Found Firestore document with data keys: ${data.keys.toList()}');
 
@@ -445,22 +452,18 @@ class MediaRepository {
           print('MediaRepository: Found base64 data in Firestore document');
 
           try {
-            // Decode base64 data
             final base64Data = data['data'] as String;
             final imageBytes = base64Decode(base64Data);
 
-            // Create temporary file
             final directory = await getTemporaryDirectory();
             final tempFileName = fileName ??
                 'blob_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final tempFile = File('${directory.path}/$tempFileName');
 
-            // Write bytes to file
             await tempFile.writeAsBytes(imageBytes);
 
             print(
-              'MediaRepository: Successfully created file from base64 data: ${tempFile.path}',
-            );
+                'MediaRepository: Successfully created file from base64 data: ${tempFile.path}');
             return tempFile;
           } catch (e) {
             print('MediaRepository: Error decoding base64 data: $e');
@@ -468,7 +471,7 @@ class MediaRepository {
         }
       }
 
-      // Fallback to original blob repository method if no base64 data found
+      // Fallback to blob repository method
       print('MediaRepository: Falling back to blob repository');
       final blobData = await blobRepository.getBlob(blobId, userId);
 
@@ -477,7 +480,6 @@ class MediaRepository {
         return null;
       }
 
-      // Save blob data to temporary file
       final directory = await getTemporaryDirectory();
       final tempFileName =
           fileName ?? 'blob_file_${DateTime.now().millisecondsSinceEpoch}';
@@ -526,14 +528,20 @@ class MediaRepository {
     return firestore
         .collection('edited_images')
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         data['blobId'] = doc.id;
+        data['id'] = doc.id;
         return data;
-      }).toList();
+      }).toList()
+        ..sort((a, b) {
+          final aTime = a['createdAt'] as Timestamp?;
+          final bTime = b['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // Descending order
+        });
     });
   }
 
@@ -542,14 +550,20 @@ class MediaRepository {
     return firestore
         .collection('edited_videos')
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         data['blobId'] = doc.id;
+        data['id'] = doc.id;
         return data;
-      }).toList();
+      }).toList()
+        ..sort((a, b) {
+          final aTime = a['createdAt'] as Timestamp?;
+          final bTime = b['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // Descending order
+        });
     });
   }
 

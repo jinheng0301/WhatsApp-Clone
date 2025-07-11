@@ -125,7 +125,11 @@ class SenderMessageCard extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: const Icon(
+                Icons.close_sharp,
+                color: Colors.red,
+                size: 24,
+              ),
             ),
           ],
         );
