@@ -425,6 +425,7 @@ class MediaRepository {
 
   // Get media by blob ID
   // Update getMediaFileFromBlob method to handle cross-user access:
+  // UPDATED: Enhanced getMediaFileFromBlob method to handle voice-over images
   Future<File?> getMediaFileFromBlob({
     required String blobId,
     required String userId,
@@ -469,29 +470,223 @@ class MediaRepository {
             print('MediaRepository: Error decoding base64 data: $e');
           }
         }
+
+        // NEW: Handle voice-over images specifically
+        if (data.containsKey('hasVoiceOver') && data['hasVoiceOver'] == true) {
+          print('MediaRepository: Handling voice-over image');
+
+          // Check for image data stored separately for voice-over content
+          if (data.containsKey('imageData')) {
+            try {
+              final base64Data = data['imageData'] as String;
+              final imageBytes = base64Decode(base64Data);
+
+              final directory = await getTemporaryDirectory();
+              final tempFileName = fileName ??
+                  'voiceover_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              final tempFile = File('${directory.path}/$tempFileName');
+
+              await tempFile.writeAsBytes(imageBytes);
+
+              print(
+                  'MediaRepository: Successfully created voice-over image file: ${tempFile.path}');
+              return tempFile;
+            } catch (e) {
+              print(
+                  'MediaRepository: Error decoding voice-over image data: $e');
+            }
+          }
+
+          // If no separate imageData, try to use the original image path
+          if (data.containsKey('originalImagePath')) {
+            final originalPath = data['originalImagePath'] as String?;
+            if (originalPath != null && File(originalPath).existsSync()) {
+              print(
+                  'MediaRepository: Using original image path for voice-over: $originalPath');
+              return File(originalPath);
+            }
+          }
+        }
+
+        // NEW: Handle different media types for voice-over content
+        final mediaType = data['mediaType'] as String?;
+        if (mediaType == 'image_with_voiceover') {
+          print('MediaRepository: Processing image_with_voiceover type');
+
+          // Try to get the base image data
+          if (data.containsKey('baseImageData')) {
+            try {
+              final base64Data = data['baseImageData'] as String;
+              final imageBytes = base64Decode(base64Data);
+
+              final directory = await getTemporaryDirectory();
+              final tempFileName = fileName ??
+                  'base_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              final tempFile = File('${directory.path}/$tempFileName');
+
+              await tempFile.writeAsBytes(imageBytes);
+
+              print(
+                  'MediaRepository: Successfully created base image file: ${tempFile.path}');
+              return tempFile;
+            } catch (e) {
+              print('MediaRepository: Error decoding base image data: $e');
+            }
+          }
+        }
       }
 
-      // Fallback to blob repository method
+      // Fallback to blob repository method with enhanced error handling
       print('MediaRepository: Falling back to blob repository');
-      final blobData = await blobRepository.getBlob(blobId, userId);
+      try {
+        final blobData = await blobRepository.getBlob(blobId, userId);
 
-      if (blobData == null) {
-        print('MediaRepository: No blob data found');
+        if (blobData == null) {
+          print('MediaRepository: No blob data found');
+
+          // NEW: Try alternative user ID approach for cross-user access
+          if (doc.exists && doc.data() != null) {
+            final data = doc.data()! as Map<String, dynamic>;
+            final originalUserId = data['userId'] as String?;
+
+            if (originalUserId != null && originalUserId != userId) {
+              print(
+                  'MediaRepository: Trying with original userId: $originalUserId');
+              final altBlobData =
+                  await blobRepository.getBlob(blobId, originalUserId);
+
+              if (altBlobData != null) {
+                final directory = await getTemporaryDirectory();
+                final tempFileName = fileName ??
+                    'blob_file_${DateTime.now().millisecondsSinceEpoch}';
+                final tempFile = File('${directory.path}/$tempFileName');
+
+                await tempFile.writeAsBytes(altBlobData);
+                print(
+                    'MediaRepository: Created file from alternative user blob data: ${tempFile.path}');
+                return tempFile;
+              }
+            }
+          }
+
+          return null;
+        }
+
+        final directory = await getTemporaryDirectory();
+        final tempFileName =
+            fileName ?? 'blob_file_${DateTime.now().millisecondsSinceEpoch}';
+        final tempFile = File('${directory.path}/$tempFileName');
+
+        await tempFile.writeAsBytes(blobData);
+        print('MediaRepository: Created file from blob data: ${tempFile.path}');
+
+        return tempFile;
+      } catch (blobError) {
+        print('MediaRepository: Blob repository error: $blobError');
         return null;
       }
-
-      final directory = await getTemporaryDirectory();
-      final tempFileName =
-          fileName ?? 'blob_file_${DateTime.now().millisecondsSinceEpoch}';
-      final tempFile = File('${directory.path}/$tempFileName');
-
-      await tempFile.writeAsBytes(blobData);
-      print('MediaRepository: Created file from blob data: ${tempFile.path}');
-
-      return tempFile;
     } catch (e) {
       print('MediaRepository: Failed to get media file from blob: $e');
       return null;
+    }
+  }
+
+  // NEW: Enhanced method specifically for voice-over content
+  Future<File?> getVoiceOverImageFromBlob({
+    required String blobId,
+    required String userId,
+    String? fileName,
+  }) async {
+    try {
+      print('MediaRepository: Getting voice-over image for blobId: $blobId');
+
+      final doc = await firestore.collection('edited_images').doc(blobId).get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+
+        // Prioritize voice-over specific image data
+        if (data.containsKey('imageData')) {
+          try {
+            final base64Data = data['imageData'] as String;
+            final imageBytes = base64Decode(base64Data);
+
+            final directory = await getTemporaryDirectory();
+            final tempFileName = fileName ??
+                'voiceover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final tempFile = File('${directory.path}/$tempFileName');
+
+            await tempFile.writeAsBytes(imageBytes);
+            return tempFile;
+          } catch (e) {
+            print('MediaRepository: Error with voice-over image data: $e');
+          }
+        }
+      }
+
+      // Fallback to regular method
+      return await getMediaFileFromBlob(
+        blobId: blobId,
+        userId: userId,
+        fileName: fileName,
+      );
+    } catch (e) {
+      print('MediaRepository: Failed to get voice-over image: $e');
+      return null;
+    }
+  }
+
+  // UPDATED: Enhanced save method for voice-over images
+  Future<String> saveVoiceOverImageToBlob({
+    required File imageFile,
+    required String originalFileName,
+    required String voiceOverPath,
+    required BuildContext context,
+    String? projectId,
+  }) async {
+    try {
+      final userId = auth.currentUser?.uid ?? 'anonymous';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = projectId != null
+          ? 'voiceover_project_${projectId}_${timestamp}.jpg'
+          : 'voiceover_${originalFileName}_${timestamp}.jpg';
+
+      final blobPath = 'media/$userId/voiceover_images/$fileName';
+
+      // Read image as base64 for direct storage
+      final imageBytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+
+      // Store the image file as a blob
+      final blobId = await blobRepository.storeFileAsBlob(
+        blobPath,
+        imageFile,
+        context,
+      );
+
+      // Create Firestore document with voice-over specific data
+      await firestore.collection('edited_images').doc(blobId).set(
+        {
+          'userId': userId,
+          'fileName': fileName,
+          'blobPath': blobPath,
+          'blobId': blobId,
+          'storageType': 'blob',
+          'mediaType': 'image_with_voiceover',
+          'originalFileName': originalFileName,
+          'projectId': projectId,
+          'hasVoiceOver': true,
+          'voiceOverPath': voiceOverPath,
+          'imageData': base64Image, // Store base64 image for reliable access
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      return blobId;
+    } catch (e) {
+      throw Exception('Failed to save voice-over image as blob: $e');
     }
   }
 

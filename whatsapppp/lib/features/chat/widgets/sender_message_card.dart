@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:swipe_to/swipe_to.dart';
 import 'package:whatsapppp/common/enums/message_enums.dart';
 import 'package:whatsapppp/common/utils/color.dart';
+import 'package:whatsapppp/features/chat/screens/mobile_chat_screen.dart';
 import 'package:whatsapppp/features/chat/widgets/display_text_image_gif.dart';
 import 'package:whatsapppp/features/profile/screen/other_user_profile_screen.dart';
 
@@ -54,88 +55,88 @@ class SenderMessageCard extends StatelessWidget {
     return colors[index];
   }
 
-  Future<void> _showProfilePreviewDialog(BuildContext context) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[300],
-                backgroundImage:
-                    senderProfilePic != null && senderProfilePic!.isNotEmpty
-                        ? NetworkImage(senderProfilePic!)
-                        : null,
-                child: senderProfilePic == null || senderProfilePic!.isEmpty
-                    ? Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.grey[600],
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                senderName ?? 'Unknown User',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
+  // Future<void> _showProfilePreviewDialog(BuildContext context) async {
+  //   return showDialog(
+  //     context: context,
+  //     builder: (BuildContext context) {
+  //       return AlertDialog(
+  //         content: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             CircleAvatar(
+  //               radius: 50,
+  //               backgroundColor: Colors.grey[300],
+  //               backgroundImage:
+  //                   senderProfilePic != null && senderProfilePic!.isNotEmpty
+  //                       ? NetworkImage(senderProfilePic!)
+  //                       : null,
+  //               child: senderProfilePic == null || senderProfilePic!.isEmpty
+  //                   ? Icon(
+  //                       Icons.person,
+  //                       size: 40,
+  //                       color: Colors.grey[600],
+  //                     )
+  //                   : null,
+  //             ),
+  //             const SizedBox(height: 16),
+  //             Text(
+  //               senderName ?? 'Unknown User',
+  //               style: const TextStyle(
+  //                 fontSize: 18,
+  //                 fontWeight: FontWeight.bold,
+  //               ),
+  //             ),
+  //             const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  const Icon(Icons.phone, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      phoneNumber.isNotEmpty ? phoneNumber : 'Not provided',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.phone, size: 16),
+  //                 const SizedBox(width: 8),
+  //                 Expanded(
+  //                   child: Text(
+  //                     phoneNumber.isNotEmpty ? phoneNumber : 'Not provided',
+  //                     style: const TextStyle(
+  //                       fontSize: 14,
+  //                       color: Colors.white70,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 12),
 
-              // Email
-              Row(
-                children: [
-                  const Icon(Icons.email, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      email.isNotEmpty ? email : 'Not provided',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Icon(
-                Icons.close_sharp,
-                color: Colors.red,
-                size: 24,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  //             // Email
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.email, size: 16),
+  //                 const SizedBox(width: 8),
+  //                 Expanded(
+  //                   child: Text(
+  //                     email.isNotEmpty ? email : 'Not provided',
+  //                     style: const TextStyle(
+  //                       fontSize: 14,
+  //                       color: Colors.white70,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ],
+  //         ),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () => Navigator.pop(context),
+  //             child: const Icon(
+  //               Icons.close_sharp,
+  //               color: Colors.red,
+  //               size: 24,
+  //             ),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +164,17 @@ class SenderMessageCard extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       // Create a simple profile preview dialog instead of navigating
-                      _showProfilePreviewDialog(context);
+                      // _showProfilePreviewDialog(context);
+                      Navigator.pushNamed(
+                        context,
+                        MobileChatScreen.routeName,
+                        arguments: {
+                          'name': senderName ?? 'Unknown User',
+                          'uid': senderUid,
+                          'isGroupChat': false,
+                          'profilePic': senderProfilePic ?? '',
+                        },
+                      );
                     },
                     child: CircleAvatar(
                       radius: 18,

@@ -54,13 +54,13 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Are you sure want to log out?'),
+          title: const Text('Are you sure want to log out?'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -73,7 +73,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                   showSnackBar(context, 'Failed to sign out: $e');
                 }
               },
-              child: Text('Conlan7firm!'),
+              child: const Text('Conlan7firm!'),
             ),
           ],
         );
@@ -88,8 +88,8 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         elevation: 0,
         backgroundColor: appBarColor,
         centerTitle: false,
-        title: Text(
-          'WhatsApp',
+        title: const Text(
+          'wannaChatOrTrim?',
           style: TextStyle(
             fontSize: 20,
             color: Colors.grey,
@@ -99,7 +99,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
         actions: [
           IconButton(
             onPressed: () {},
-            icon: Icon(
+            icon: const Icon(
               Icons.search,
               color: Colors.grey,
             ),
@@ -155,16 +155,16 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
       body: PageView(
         controller: pageController,
         onPageChanged: onPageChanged,
-        physics: NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         children: [
-          ContactsList(),
-          StatusContactsScreen(),
-          NewProjectScreen(),
+          const ContactsList(),
+          const StatusContactsScreen(),
+          const NewProjectScreen(),
           ProfileScreen(),
         ],
       ),
       bottomNavigationBar: ClipRRect(
-        borderRadius: BorderRadius.vertical(
+        borderRadius: const BorderRadius.vertical(
           top: Radius.circular(30),
         ),
         child: CupertinoTabBar(
@@ -235,7 +235,7 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                 Navigator.pushNamed(context, SelectContactScreens.routeName);
               },
               backgroundColor: tabColor,
-              child: Icon(Icons.comment, size: 30, color: Colors.white),
+              child: const Icon(Icons.comment, size: 30, color: Colors.white),
             );
           case 1:
             return FloatingActionButton(
@@ -250,7 +250,8 @@ class _MobileLayoutScreenState extends ConsumerState<MobileLayoutScreen> {
                 }
               },
               backgroundColor: tabColor,
-              child: Icon(Icons.camera_alt, size: 30, color: Colors.white),
+              child:
+                  const Icon(Icons.camera_alt, size: 30, color: Colors.white),
             );
 
           default:

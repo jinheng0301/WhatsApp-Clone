@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
+import 'package:whatsapppp/features/multimedia_editing/controller/voice_over_preview_controller.dart';
 import 'package:whatsapppp/features/multimedia_editing/repository/media_repository.dart';
+import 'package:whatsapppp/features/multimedia_editing/services/audio_service.dart';
 import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
 class ProfileImagePreviewHandler {
@@ -13,6 +15,11 @@ class ProfileImagePreviewHandler {
     String blobId,
     Map<String, dynamic> mediaFile,
   ) {
+    // Check if this image has a voice-over
+    final bool hasVoiceOver = mediaFile['hasVoiceOver'] == true ||
+        mediaFile['voiceOverPath'] != null ||
+        mediaFile['mediaType'] == 'image_with_voiceover';
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -22,9 +29,21 @@ class ProfileImagePreviewHandler {
           children: [
             AppBar(
               backgroundColor: Colors.black,
-              title: Text(
-                mediaFile['fileName'] ?? 'Image',
-                style: const TextStyle(color: Colors.white),
+              title: Row(
+                children: [
+                  Text(
+                    mediaFile['fileName'] ?? 'Image',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  if (hasVoiceOver) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.mic,
+                      color: Colors.purple,
+                      size: 16,
+                    ),
+                  ],
+                ],
               ),
               iconTheme: const IconThemeData(color: Colors.white),
               actions: [
@@ -63,11 +82,22 @@ class ProfileImagePreviewHandler {
                               );
                             }
 
-                            return InteractiveViewer(
-                              child: Image.file(
-                                imageFile,
-                                fit: BoxFit.contain,
-                              ),
+                            return Stack(
+                              children: [
+                                InteractiveViewer(
+                                  child: Image.file(
+                                    imageFile,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                // Voice-over controls overlay
+                                if (hasVoiceOver)
+                                  _buildVoiceOverControls(
+                                    context,
+                                    mediaFile,
+                                    blobId,
+                                  ),
+                              ],
                             );
                           },
                         );
@@ -76,6 +106,28 @@ class ProfileImagePreviewHandler {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // New method to build voice-over controls
+  Widget _buildVoiceOverControls(
+      BuildContext context, Map<String, dynamic> mediaFile, String blobId) {
+    return Positioned(
+      bottom: 20,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.purple.withOpacity(0.5)),
+        ),
+        child: VoiceOverPreviewController(
+          mediaFile: mediaFile,
+          blobId: blobId,
         ),
       ),
     );
@@ -91,6 +143,9 @@ class ProfileImagePreviewHandler {
     // Check if current user is the owner of the media
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final isOwner = mediaOwnerId == null || currentUserId == mediaOwnerId;
+    final bool hasVoiceOver = mediaFile['hasVoiceOver'] == true ||
+        mediaFile['voiceOverPath'] != null ||
+        mediaFile['mediaType'] == 'image_with_voiceover';
 
     showModalBottomSheet(
       context: context,
@@ -115,6 +170,26 @@ class ProfileImagePreviewHandler {
                 _downloadImage(context, ref, blobId);
               },
             ),
+            // Voice-over specific options
+            if (hasVoiceOver) ...[
+              ListTile(
+                leading: const Icon(Icons.play_arrow, color: Colors.purple),
+                title: const Text('Play Voice-Over'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _playVoiceOver(context, mediaFile, blobId);
+                },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.download_outlined, color: Colors.purple),
+                title: const Text('Download Voice-Over'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _downloadVoiceOver(context, ref, blobId);
+                },
+              ),
+            ],
             ListTile(
               leading: const Icon(Icons.info),
               title: const Text('Info'),
@@ -153,6 +228,31 @@ class ProfileImagePreviewHandler {
     showSnackBar(
       context,
       'Download functionality to be implemented',
+    );
+  }
+
+  // New methods for voice-over functionality
+  void _playVoiceOver(
+      BuildContext context, Map<String, dynamic> mediaFile, String blobId) {
+    try {
+      // Extract voice-over path from mediaFile or construct it
+      final voiceOverPath = mediaFile['voiceOverPath'] as String?;
+      if (voiceOverPath != null) {
+        AudioService.previewAudio(voiceOverPath);
+        showSnackBar(context, 'Playing voice-over...');
+      } else {
+        showSnackBar(context, 'Voice-over path not found');
+      }
+    } catch (e) {
+      showSnackBar(context, 'Error playing voice-over: $e');
+    }
+  }
+
+  void _downloadVoiceOver(BuildContext context, WidgetRef ref, String blobId) {
+    // Implement voice-over download functionality
+    showSnackBar(
+      context,
+      'Voice-over download functionality to be implemented',
     );
   }
 
