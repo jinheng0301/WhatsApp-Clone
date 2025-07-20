@@ -9,6 +9,47 @@ import 'package:whatsapppp/features/multimedia_editing/services/audio_service.da
 import 'package:whatsapppp/features/profile/screen/profile_screen.dart';
 
 class ProfileImagePreviewHandler {
+  bool _hasVoiceOver(Map<String, dynamic> mediaFile) {
+    // Check multiple indicators for voice-over content
+    final bool hasVoiceOverFlag = mediaFile['hasVoiceOver'] == true;
+    final bool hasVoiceOverPath = mediaFile['voiceOverPath'] != null &&
+        (mediaFile['voiceOverPath'] as String).isNotEmpty;
+    final bool hasVoiceOverType =
+        mediaFile['mediaType'] == 'image_with_voiceover';
+    final bool mediaTypeContainsVoiceover =
+        mediaFile['mediaType']?.toString().contains('voiceover') == true;
+
+    // NEW: Check original filename for voice-over indicators
+    final String? originalFileName = mediaFile['originalFileName'] as String?;
+    final bool fileNameIndicatesVoiceOver = originalFileName != null &&
+        (originalFileName.contains('voiceover') ||
+            originalFileName.contains('with_voiceover') ||
+            originalFileName.endsWith(
+                '.mp4')); // Video files often indicate voice-over content
+
+    // NEW: Check if there are audio-related fields
+    final bool hasAudioPath = mediaFile['audioPath'] != null;
+    final bool hasVoiceOverUrl = mediaFile['voiceOverUrl'] != null;
+
+    print('🎤 Voice-over detection for ${mediaFile['blobId']}:');
+    print('   - hasVoiceOverFlag: $hasVoiceOverFlag');
+    print('   - hasVoiceOverPath: $hasVoiceOverPath');
+    print('   - hasVoiceOverType: $hasVoiceOverType');
+    print('   - mediaTypeContainsVoiceover: $mediaTypeContainsVoiceover');
+    print('   - fileNameIndicatesVoiceOver: $fileNameIndicatesVoiceOver');
+    print('   - hasAudioPath: $hasAudioPath');
+    print('   - hasVoiceOverUrl: $hasVoiceOverUrl');
+    print('   - originalFileName: $originalFileName');
+
+    return hasVoiceOverFlag ||
+        hasVoiceOverPath ||
+        hasVoiceOverType ||
+        mediaTypeContainsVoiceover ||
+        fileNameIndicatesVoiceOver ||
+        hasAudioPath ||
+        hasVoiceOverUrl;
+  }
+
   void showImagePreview(
     BuildContext context,
     WidgetRef ref,
@@ -16,9 +57,7 @@ class ProfileImagePreviewHandler {
     Map<String, dynamic> mediaFile,
   ) {
     // Check if this image has a voice-over
-    final bool hasVoiceOver = mediaFile['hasVoiceOver'] == true ||
-        mediaFile['voiceOverPath'] != null ||
-        mediaFile['mediaType'] == 'image_with_voiceover';
+    final bool hasVoiceOver = _hasVoiceOver(mediaFile);
 
     showDialog(
       context: context,
@@ -31,9 +70,11 @@ class ProfileImagePreviewHandler {
               backgroundColor: Colors.black,
               title: Row(
                 children: [
-                  Text(
-                    mediaFile['fileName'] ?? 'Image',
-                    style: const TextStyle(color: Colors.white),
+                  Expanded(
+                    child: Text(
+                      mediaFile['fileName'] ?? 'Image',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
                   if (hasVoiceOver) ...[
                     const SizedBox(width: 8),
@@ -62,7 +103,12 @@ class ProfileImagePreviewHandler {
                 padding: const EdgeInsets.all(16),
                 child: Consumer(
                   builder: (context, ref, child) {
-                    return ref.watch(blobImageProvider(blobId)).when(
+                    // Use the voice-over specific provider if needed
+                    final provider = hasVoiceOver
+                        ? voiceOverImageProvider(blobId)
+                        : blobImageProvider(blobId);
+
+                    return ref.watch(provider).when(
                           loading: () => const Center(
                             child: Loader(),
                           ),
@@ -143,9 +189,7 @@ class ProfileImagePreviewHandler {
     // Check if current user is the owner of the media
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final isOwner = mediaOwnerId == null || currentUserId == mediaOwnerId;
-    final bool hasVoiceOver = mediaFile['hasVoiceOver'] == true ||
-        mediaFile['voiceOverPath'] != null ||
-        mediaFile['mediaType'] == 'image_with_voiceover';
+    final bool hasVoiceOver = _hasVoiceOver(mediaFile);
 
     showModalBottomSheet(
       context: context,
@@ -154,6 +198,35 @@ class ProfileImagePreviewHandler {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Voice-over indicator header
+            if (hasVoiceOver)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mic, color: Colors.purple, size: 16),
+                    SizedBox(width: 8),
+                    Text(
+                      'Voice-Over Content',
+                      style: TextStyle(
+                        color: Colors.purple,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (hasVoiceOver) const SizedBox(height: 12),
+
             ListTile(
               leading: const Icon(Icons.share),
               title: const Text('Share'),
@@ -175,6 +248,7 @@ class ProfileImagePreviewHandler {
               ListTile(
                 leading: const Icon(Icons.play_arrow, color: Colors.purple),
                 title: const Text('Play Voice-Over'),
+                subtitle: Text(_getVoiceOverInfo(mediaFile)),
                 onTap: () {
                   Navigator.pop(context);
                   _playVoiceOver(context, mediaFile, blobId);
@@ -213,6 +287,15 @@ class ProfileImagePreviewHandler {
         ),
       ),
     );
+  }
+
+  // Helper method to get voice-over info
+  String _getVoiceOverInfo(Map<String, dynamic> mediaFile) {
+    final voiceOverPath = mediaFile['voiceOverPath'] as String?;
+    if (voiceOverPath != null) {
+      return 'Audio file attached';
+    }
+    return 'Voice-over available';
   }
 
   void _shareImage(BuildContext context, WidgetRef ref, String blobId) {

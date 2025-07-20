@@ -85,6 +85,34 @@ final blobImageProvider =
   }
 });
 
+final voiceOverImageProvider =
+    FutureProvider.family<File?, String>((ref, blobId) async {
+  final mediaRepository = ref.watch(mediaRepositoryProvider);
+  final userId = mediaRepository.auth.currentUser?.uid;
+
+  print('🎤 VoiceOverImageProvider called for blobId: $blobId');
+
+  if (userId == null) {
+    print('❌ No user ID found for voice-over image');
+    return null;
+  }
+
+  try {
+    // Use the enhanced voice-over method
+    final result = await mediaRepository.getVoiceOverImageFromBlob(
+      blobId: blobId,
+      userId: userId,
+    );
+
+    print('🎤 Voice-over image result: ${result?.path ?? 'null'}');
+    return result;
+  } catch (e, stackTrace) {
+    print('💥 VoiceOverImageProvider error: $e');
+    print('📚 Stack trace: $stackTrace');
+    return null;
+  }
+});
+
 final blobVideoProvider =
     FutureProvider.family<File?, String>((ref, blobId) async {
   final mediaRepository = ref.watch(mediaRepositoryProvider);
@@ -163,6 +191,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() {
       _page = page;
     });
+  }
+
+  bool _hasVoiceOver(Map<String, dynamic> mediaFile) {
+    // Check multiple indicators for voice-over content
+    final bool hasVoiceOverFlag = mediaFile['hasVoiceOver'] == true;
+    final bool hasVoiceOverPath = mediaFile['voiceOverPath'] != null &&
+        (mediaFile['voiceOverPath'] as String).isNotEmpty;
+    final bool hasVoiceOverType =
+        mediaFile['mediaType'] == 'image_with_voiceover';
+    final bool mediaTypeContainsVoiceover =
+        mediaFile['mediaType']?.toString().contains('voiceover') == true;
+
+    // Enhanced filename checks
+    final String? originalFileName = mediaFile['originalFileName'] as String?;
+    final bool fileNameIndicatesVoiceOver = originalFileName != null &&
+        (originalFileName.contains('voiceover') ||
+            originalFileName.contains('with_voiceover') ||
+            originalFileName.endsWith('.mp4') ||
+            originalFileName
+                .contains('_with_voiceover')); // Added this specific pattern
+
+    // Check if there are audio-related fields
+    final bool hasAudioPath = mediaFile['audioPath'] != null;
+    final bool hasVoiceOverUrl = mediaFile['voiceOverUrl'] != null;
+
+    // NEW: Check for video files that should be treated as voice-over content
+    final bool isVideoFile =
+        originalFileName?.toLowerCase().endsWith('.mp4') == true ||
+            mediaFile['contentType']?.toString().contains('video') == true;
+
+    print('🎤 Voice-over detection for ${mediaFile['blobId']}:');
+    print('   - hasVoiceOverFlag: $hasVoiceOverFlag');
+    print('   - hasVoiceOverPath: $hasVoiceOverPath');
+    print('   - hasVoiceOverType: $hasVoiceOverType');
+    print('   - mediaTypeContainsVoiceover: $mediaTypeContainsVoiceover');
+    print('   - fileNameIndicatesVoiceOver: $fileNameIndicatesVoiceOver');
+    print('   - hasAudioPath: $hasAudioPath');
+    print('   - hasVoiceOverUrl: $hasVoiceOverUrl');
+    print('   - isVideoFile: $isVideoFile');
+    print('   - originalFileName: $originalFileName');
+    print('   - contentType: ${mediaFile['contentType']}');
+
+    final result = hasVoiceOverFlag ||
+        hasVoiceOverPath ||
+        hasVoiceOverType ||
+        mediaTypeContainsVoiceover ||
+        fileNameIndicatesVoiceOver ||
+        hasAudioPath ||
+        hasVoiceOverUrl ||
+        isVideoFile;
+
+    print('   - FINAL RESULT: $result');
+    return result;
   }
 
   Widget _buildStatsSection(WidgetRef ref) {
@@ -305,6 +386,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }) {
     final imagePreviewHandler = ProfileImagePreviewHandler();
 
+    // Use the enhanced voice-over detection
+    final hasVoiceOver = _hasVoiceOver(mediaFile);
+
     return GestureDetector(
       onTap: () => imagePreviewHandler.showImagePreview(
         context,
@@ -326,137 +410,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Consumer(
-            builder: (context, ref, child) {
-              print('🖼️ Building grid item for blobId: $blobId');
-              print('📄 Media file data: $mediaFile');
+          child: Stack(
+            children: [
+              Consumer(
+                builder: (context, ref, child) {
+                  print('🖼️ Building grid item for blobId: $blobId');
+                  print('📄 Media file data: $mediaFile');
 
-              return ref.watch(blobImageProvider(blobId)).when(
-                loading: () {
-                  print('⏳ Loading image for blobId: $blobId');
-                  return Container(
-                    color: Colors.grey.shade200,
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(strokeWidth: 2),
-                          SizedBox(height: 4),
-                          Text(
-                            'Loading...',
-                            style: TextStyle(fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                error: (err, stackTrace) {
-                  print('💥 Error loading image for blobId: $blobId');
-                  print('   Error: $err');
-                  print('   Stack: $stackTrace');
-                  return Container(
-                    color: Colors.red.shade100,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.error,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Error',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.red[700],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            err.toString().length > 20
-                                ? '${err.toString().substring(0, 20)}...'
-                                : err.toString(),
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Colors.red[600],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                data: (imageFile) {
-                  if (imageFile == null) {
-                    print('❌ Image file is null for blobId: $blobId');
-                    print('   This usually means blob retrieval failed');
+                  print('🎤 Has voice-over: $hasVoiceOver');
 
-                    // Show debug info in the UI
-                    return Container(
-                      color: Colors.orange.shade100,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.image_not_supported,
-                              color: Colors.orange,
-                              size: 20,
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Not found',
-                              style: TextStyle(fontSize: 10),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'ID: ${blobId.length > 8 ? blobId.substring(0, 8) : blobId}...',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
+                  // Choose appropriate provider based on content type
+                  final provider = hasVoiceOver
+                      ? voiceOverImageProvider(blobId)
+                      : blobImageProvider(blobId);
 
-                  print('✅ Successfully got image file: ${imageFile.path}');
-                  return Image.file(
-                    imageFile,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (context, error, stackTrace) {
-                      print(
-                        '💥 Image.file error for ${imageFile.path}: $error',
-                      );
+                  return ref.watch(provider).when(
+                    loading: () {
+                      print('⏳ Loading image for blobId: $blobId');
                       return Container(
-                        color: Colors.yellow.shade100,
+                        color: hasVoiceOver
+                            ? Colors.purple.shade50
+                            : Colors.grey.shade200,
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(strokeWidth: 2),
+                              SizedBox(height: 4),
+                              Text(
+                                'Loading...',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    error: (err, stackTrace) {
+                      print('💥 Error loading image for blobId: $blobId');
+                      print('   Error: $err');
+                      print('   Stack: $stackTrace');
+                      return Container(
+                        color: Colors.red.shade100,
                         child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.broken_image,
-                                color: Colors.orange,
+                                Icons.error,
+                                color: Colors.red,
                                 size: 20,
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Broken',
-                                style: TextStyle(fontSize: 10),
-                              ),
                               Text(
-                                error.toString().length > 15
-                                    ? '${error.toString().substring(0, 15)}...'
-                                    : error.toString(),
-                                style: const TextStyle(fontSize: 8),
+                                'Error',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.red[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                err.toString().length > 20
+                                    ? '${err.toString().substring(0, 20)}...'
+                                    : err.toString(),
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Colors.red[600],
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -464,10 +485,116 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       );
                     },
+                    data: (imageFile) {
+                      if (imageFile == null) {
+                        print('❌ Image file is null for blobId: $blobId');
+                        print('   This usually means blob retrieval failed');
+
+                        // Show debug info in the UI
+                        return Container(
+                          color: Colors.orange.shade100,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  hasVoiceOver
+                                      ? Icons.mic_off
+                                      : Icons.image_not_supported,
+                                  color: hasVoiceOver
+                                      ? Colors.purple
+                                      : Colors.orange,
+                                  size: 20,
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Not found',
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'ID: ${blobId.length > 8 ? blobId.substring(0, 8) : blobId}...',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      print('✅ Successfully got image file: ${imageFile.path}');
+                      return Image.file(
+                        imageFile,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          print(
+                            '💥 Image.file error for ${imageFile.path}: $error',
+                          );
+                          return Container(
+                            color: Colors.yellow.shade100,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Broken',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
+                                  Text(
+                                    error.toString().length > 15
+                                        ? '${error.toString().substring(0, 15)}...'
+                                        : error.toString(),
+                                    style: const TextStyle(fontSize: 8),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+
+              // Voice-over indicator overlay
+              if (hasVoiceOver)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.purple,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.mic,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -565,12 +692,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       },
       onLongPress: () {
         videoPreviewHandler.showVideoOptions(
-          context,
-          ref,
-          blobId,
-          videoFile,
-          null
-        );
+            context, ref, blobId, videoFile, null);
       },
       child: Container(
         decoration: BoxDecoration(
