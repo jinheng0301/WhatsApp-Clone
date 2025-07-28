@@ -67,8 +67,6 @@ class MusicCategory {
 
 // External Music Service Class
 class ExternalMusicService {
-  static const String _baseUrl = 'https://api.freemusicarchive.org/recent.json';
-  static const String _alternativeUrl = 'https://api.jamendo.com/v3.0';
   static final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Predefined music categories

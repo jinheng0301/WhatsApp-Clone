@@ -184,6 +184,187 @@ class MediaEditorService {
     await File(outputPath).writeAsBytes(img.encodeJpg(image));
   }
 
+  // New method to apply multiple effects at once
+  static Future<String> applyMultipleEffects({
+    required String mediaPath,
+    required Map<String, double> effects,
+    required bool isVideo,
+  }) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final outputPath =
+        '${mediaPath}_combined_effects_$timestamp.${isVideo ? 'mp4' : 'jpg'}';
+
+    if (isVideo) {
+      await _applyMultipleVideoEffects(mediaPath, effects, outputPath);
+    } else {
+      await _applyMultipleImageEffects(mediaPath, effects, outputPath);
+    }
+
+    return outputPath;
+  }
+
+  // Generate preview with effects (optimized for real-time preview)
+  static Future<String> generateEffectPreview({
+    required String mediaPath,
+    required Map<String, double> effects,
+    required bool isVideo,
+  }) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final outputPath =
+        '${mediaPath}_preview_$timestamp.${isVideo ? 'mp4' : 'jpg'}';
+
+    if (isVideo) {
+      // For video preview, we might want to process only first few seconds for speed
+      await _generateVideoEffectPreview(mediaPath, effects, outputPath);
+    } else {
+      await _applyMultipleImageEffects(mediaPath, effects, outputPath);
+    }
+
+    return outputPath;
+  }
+
+  // Apply multiple effects to video
+  static Future<void> _applyMultipleVideoEffects(
+    String inputPath,
+    Map<String, double> effects,
+    String outputPath,
+  ) async {
+    List<String> filters = [];
+
+    // Build filter chain
+    if (effects['blur'] != null && effects['blur']! > 0) {
+      filters.add('boxblur=${effects['blur']!.toStringAsFixed(1)}:1');
+    }
+
+    if (effects['brightness'] != null && effects['brightness'] != 0) {
+      filters.add('eq=brightness=${effects['brightness']!.toStringAsFixed(2)}');
+    }
+
+    if (effects['contrast'] != null && effects['contrast'] != 1.0) {
+      filters.add('eq=contrast=${effects['contrast']!.toStringAsFixed(2)}');
+    }
+
+    if (filters.isEmpty) return;
+
+    final filterString = filters.join(',');
+    final command =
+        '-i "$inputPath" -vf "$filterString" -c:a copy "$outputPath"';
+
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (!ReturnCode.isSuccess(returnCode)) {
+      throw Exception('Failed to apply video effects');
+    }
+  }
+
+  // Generate video effect preview (first 3 seconds for speed)
+  static Future<void> _generateVideoEffectPreview(
+    String inputPath,
+    Map<String, double> effects,
+    String outputPath,
+  ) async {
+    List<String> filters = [];
+
+    // Build filter chain (same as above)
+    if (effects['blur'] != null && effects['blur']! > 0) {
+      filters.add('boxblur=${effects['blur']!.toStringAsFixed(1)}:1');
+    }
+
+    if (effects['brightness'] != null && effects['brightness'] != 0) {
+      filters.add('eq=brightness=${effects['brightness']!.toStringAsFixed(2)}');
+    }
+
+    if (effects['contrast'] != null && effects['contrast'] != 1.0) {
+      filters.add('eq=contrast=${effects['contrast']!.toStringAsFixed(2)}');
+    }
+
+    if (filters.isEmpty) {
+      // If no effects, just copy the original file
+      await File(inputPath).copy(outputPath);
+      return;
+    }
+
+    final filterString = filters.join(',');
+    // Limit preview to first 3 seconds for faster processing
+    final command =
+        '-i "$inputPath" -t 3 -vf "$filterString" -c:a copy "$outputPath"';
+
+    final session = await FFmpegKit.execute(command);
+    final returnCode = await session.getReturnCode();
+
+    if (!ReturnCode.isSuccess(returnCode)) {
+      // Fallback: process entire video if short preview fails
+      await _applyMultipleVideoEffects(inputPath, effects, outputPath);
+    }
+  }
+
+  // Apply multiple effects to image
+  static Future<void> _applyMultipleImageEffects(
+    String inputPath,
+    Map<String, double> effects,
+    String outputPath,
+  ) async {
+    final bytes = await File(inputPath).readAsBytes();
+    img.Image? image = img.decodeImage(bytes);
+
+    if (image == null) {
+      throw Exception('Failed to decode image');
+    }
+
+    // Apply blur effect
+    if (effects['blur'] != null && effects['blur']! > 0) {
+      final blurRadius = (effects['blur']! / 2).round().clamp(1, 10);
+      image = img.gaussianBlur(image, radius: blurRadius);
+    }
+
+    // Apply brightness and contrast effects
+    double brightness = 1.0;
+    double contrast = 1.0;
+
+    if (effects['brightness'] != null && effects['brightness'] != 0) {
+      // Convert brightness value from -1,1 range to adjustment factor
+      brightness = 1.0 + effects['brightness']!;
+    }
+
+    if (effects['contrast'] != null && effects['contrast'] != 1.0) {
+      contrast = effects['contrast']!;
+    }
+
+    if (brightness != 1.0 || contrast != 1.0) {
+      image = img.adjustColor(
+        image,
+        brightness: brightness,
+        contrast: contrast,
+      );
+    }
+
+    // Save the processed image
+    await File(outputPath).writeAsBytes(img.encodeJpg(image, quality: 90));
+  }
+
+  // Clean up temporary preview files
+  static Future<void> cleanupPreviewFiles(String basePath) async {
+    try {
+      final directory = Directory(basePath).parent;
+      final files = directory.listSync();
+
+      for (final file in files) {
+        if (file is File && file.path.contains('_preview_')) {
+          final lastModified = await file.lastModified();
+          final now = DateTime.now();
+
+          // Delete preview files older than 1 hour
+          if (now.difference(lastModified).inHours > 1) {
+            await file.delete();
+          }
+        }
+      }
+    } catch (e) {
+      print('Error cleaning up preview files: $e');
+    }
+  }
+
   static Future<void> _applyImageFilter(
     String inputPath,
     String filterType,

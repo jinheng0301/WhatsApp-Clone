@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -65,6 +66,7 @@ class PreviewPanelState extends State<PreviewPanel> {
   List<OverlayItem> _overlayItems = [];
   OverlayItem? _selectedItem;
   Size _previewSize = Size.zero;
+  late String _currentMediaPath;
 
   // Video editing specific properties
   Duration _videoDuration = Duration.zero;
@@ -87,12 +89,15 @@ class PreviewPanelState extends State<PreviewPanel> {
   bool _isDynamicVideo = false;
   // Tracks if image became video due to voice over
 
-  String _currentMediaPath = '';
-  bool _isProcessing = false;
+  // Add effect preview properties
+  String? _originalMediaPath;
+  Map<String, double> _currentEffects = {};
+  Timer? _effectPreviewTimer;
 
   @override
   void initState() {
     super.initState();
+    _originalMediaPath = widget.mediaPath;
     _currentMediaPath = widget.mediaPath;
     if (widget.isVideo) {
       _initializeVideoPlayer();
@@ -115,57 +120,121 @@ class PreviewPanelState extends State<PreviewPanel> {
     }
   }
 
-  // Add method to handle media path updates (for voice over)
+  // Method to apply effect preview in real-time
+  Future<void> applyEffectPreview(Map<String, double> effects) async {
+    // Cancel any pending preview update
+    _effectPreviewTimer?.cancel();
+
+    // Store current effects
+    _currentEffects = Map.from(effects);
+
+    // Debounce the preview update to avoid too many calls
+    _effectPreviewTimer = Timer(const Duration(milliseconds: 300), () async {
+      await _updateEffectPreview();
+    });
+  }
+
+  // Reset effect preview to original media
+  void resetEffectPreview() {
+    _effectPreviewTimer?.cancel();
+    _currentEffects.clear();
+
+    if (_originalMediaPath != null) {
+      setState(() {
+        _currentMediaPath = _originalMediaPath!;
+      });
+
+      // Reinitialize video player if it's a video
+      if (widget.isVideo || _isDynamicVideo) {
+        _reinitializeVideoPlayer(_originalMediaPath!);
+      }
+    }
+  }
+
+  // Update media path (for final effect application)
   void updateMediaPath(String newPath) {
-    // Dispose existing video controller if any
+    setState(() {
+      _originalMediaPath = newPath;
+      _currentMediaPath = newPath;
+    });
+
+    if (widget.isVideo || _isDynamicVideo) {
+      _reinitializeVideoPlayer(newPath);
+    }
+  }
+
+  // Internal method to update effect preview
+  Future<void> _updateEffectPreview() async {
+    if (_originalMediaPath == null) return;
+
+    try {
+      // Check if any effects are applied
+      final hasEffects = _currentEffects.values.any((value) =>
+          _currentEffects['blur'] != 0 ||
+          _currentEffects['brightness'] != 0 ||
+          _currentEffects['contrast'] != 1.0);
+
+      if (!hasEffects) {
+        resetEffectPreview();
+        return;
+      }
+
+      // Generate preview with current effects
+      final previewPath = await MediaEditorService.generateEffectPreview(
+        mediaPath: _originalMediaPath!,
+        effects: _currentEffects,
+        isVideo: widget.isVideo || _isDynamicVideo,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentMediaPath = previewPath;
+        });
+
+        // Reinitialize video player with preview
+        if (widget.isVideo || _isDynamicVideo) {
+          _reinitializeVideoPlayer(previewPath);
+        }
+      }
+    } catch (e) {
+      print('Error generating effect preview: $e');
+    }
+  }
+
+  // Helper method to reinitialize video player
+  void _reinitializeVideoPlayer(String mediaPath) {
+    // Dispose current controller
     _videoController?.dispose();
     _videoController = null;
 
     setState(() {
       _isInitialized = false;
-      _isDynamicVideo = false;
-      _isPlaying = false;
     });
 
-    // Update the widget's mediaPath reference
-    // Note: You might need to pass this through a callback to parent
+    // Initialize new controller
+    _videoController = VideoPlayerController.file(File(mediaPath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _videoDuration = _videoController!.value.duration;
+            _endTrim = _videoDuration;
+            _currentPosition = Duration.zero;
+            _startTrim = Duration.zero;
+          });
 
-    // Check if new path is video
-    final isVideoFile = newPath.toLowerCase().endsWith('.mp4') ||
-        newPath.toLowerCase().endsWith('.mov') ||
-        newPath.toLowerCase().endsWith('.avi') ||
-        newPath.toLowerCase().endsWith('.mkv');
-
-    if (isVideoFile) {
-      _isDynamicVideo = true;
-      // Initialize video player for the new video file
-      _videoController = VideoPlayerController.file(File(newPath))
-        ..initialize().then((_) {
-          if (mounted) {
-            setState(() {
-              _isInitialized = true;
-              _videoDuration = _videoController!.value.duration;
-              _endTrim = _videoDuration;
-              _currentPosition = Duration.zero;
-              _startTrim = Duration.zero;
-            });
-
-            _videoController!.addListener(_onVideoPositionChanged);
-            _videoController!.seekTo(Duration.zero);
-
-            // ADDED: Set volume to ensure audio is audible
-            _videoController!.setVolume(1.0);
-
-            print(
-                'Voice over video initialized. Duration: ${_formatDuration(_videoDuration)}');
-          }
-        }).catchError((error) {
-          print('Error initializing video after voice over: $error');
-        });
-    } else {
-      // Handle case where it's still an image (shouldn't happen with voice over)
-      print('Media path updated but not a video file: $newPath');
-    }
+          _videoController!.addListener(_onVideoPositionChanged);
+          _videoController!.seekTo(Duration.zero);
+          _videoController!.setVolume(_volume);
+        }
+      }).catchError((error) {
+        print('Error reinitializing video player: $error');
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+          });
+        }
+      });
   }
 
   Future<void> applyVideoFilter(String filterType) async {
@@ -662,6 +731,16 @@ class PreviewPanelState extends State<PreviewPanel> {
                                 fontSize: 10,
                               ),
                             ),
+
+                          // Show effect preview indicator
+                          if (_currentEffects.isNotEmpty)
+                            const Text(
+                              'Preview Mode',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 10,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -1105,11 +1184,24 @@ class PreviewPanelState extends State<PreviewPanel> {
     );
   }
 
+  // Modified _buildImagePreview to use current media path
   Widget _buildImagePreview() {
     return Center(
       child: Image.file(
-        File(widget.mediaPath),
+        File(_currentMediaPath),
         fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error, size: 48, color: Colors.red),
+                SizedBox(height: 8),
+                Text('Error loading image preview'),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

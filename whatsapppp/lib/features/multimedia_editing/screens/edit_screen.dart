@@ -39,6 +39,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   // ignore: unused_field
   List<OverlayItem> _currentOverlays = [];
 
+  // Add effect slider values
+  double _blurValue = 0.0;
+  double _brightnessValue = 0.0;
+  double _contrastValue = 1.0;
+  bool _isApplyingEffect = false;
+
   // Handler instances
   late final AudioHandler _audioHandler;
   late final TextHandler _textHandler;
@@ -416,17 +422,209 @@ class _EditScreenState extends ConsumerState<EditScreen> {
   }
 
   Widget _buildEffectTools() {
-    final effects = [
-      ('Blur', Icons.blur_on),
-      ('Brighten', Icons.brightness_high),
-      ('Darken', Icons.filter_hdr),
-      ('Contrast', Icons.view_in_ar),
-    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Blur Effect Slider
+            _buildEffectSlider(
+              'Blur',
+              Icons.blur_on,
+              _blurValue,
+              0.0,
+              10.0,
+              (value) {
+                setState(() => _blurValue = value);
+                _applyEffectPreview('blur', value);
+              },
+            ),
+            const SizedBox(height: 16),
 
-    return GridView.count(
-      crossAxisCount: 3,
-      children:
-          effects.map((effect) => _effectButton(effect.$1, effect.$2)).toList(),
+            // Brightness Effect Slider
+            _buildEffectSlider(
+              'Brightness',
+              Icons.brightness_high,
+              _brightnessValue,
+              -1.0,
+              1.0,
+              (value) {
+                setState(() => _brightnessValue = value);
+                _applyEffectPreview('brightness', value);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Contrast Effect Slider
+            _buildEffectSlider(
+              'Contrast',
+              Icons.contrast,
+              _contrastValue,
+              0.5,
+              3.0,
+              (value) {
+                setState(() => _contrastValue = value);
+                _applyEffectPreview('contrast', value);
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // Reset and Apply buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _resetAllEffects,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reset'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[700],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isApplyingEffect ? null : _applyFinalEffects,
+                  icon: _isApplyingEffect
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check),
+                  label: Text(_isApplyingEffect ? 'Applying...' : 'Apply'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Apply effect preview in real-time
+  void _applyEffectPreview(String effectType, double value) {
+    // Check if any effect is non-default
+    final hasEffects =
+        _blurValue > 0 || _brightnessValue != 0 || _contrastValue != 1.0;
+
+    if (hasEffects) {
+      // Apply combined effects to preview
+      _previewPanelKey.currentState?.applyEffectPreview({
+        'blur': _blurValue,
+        'brightness': _brightnessValue,
+        'contrast': _contrastValue,
+      });
+    } else {
+      // Reset to original
+      _previewPanelKey.currentState?.resetEffectPreview();
+    }
+  }
+
+  // Reset all effects to default values
+  void _resetAllEffects() {
+    setState(() {
+      _blurValue = 0.0;
+      _brightnessValue = 0.0;
+      _contrastValue = 1.0;
+    });
+    _previewPanelKey.currentState?.resetEffectPreview();
+  }
+
+  // Apply final effects to the actual media file
+  Future<void> _applyFinalEffects() async {
+    if (_blurValue == 0 && _brightnessValue == 0 && _contrastValue == 1.0) {
+      showSnackBar(context, 'No effects to apply');
+      return;
+    }
+
+    setState(() => _isApplyingEffect = true);
+
+    try {
+      final newPath = await MediaEditorService.applyMultipleEffects(
+        mediaPath: widget.mediaPath,
+        effects: {
+          'blur': _blurValue,
+          'brightness': _brightnessValue,
+          'contrast': _contrastValue,
+        },
+        isVideo: widget.isVideo,
+      );
+
+      setState(() {
+        widget.mediaPath = newPath;
+        _isApplyingEffect = false;
+      });
+
+      // Update preview panel with new media path
+      _previewPanelKey.currentState?.updateMediaPath(newPath);
+
+      showSnackBar(context, 'Effects applied successfully');
+    } catch (e) {
+      setState(() => _isApplyingEffect = false);
+      showSnackBar(context, 'Error applying effects: $e');
+    }
+  }
+
+  Widget _buildEffectSlider(
+    String title,
+    IconData icon,
+    double value,
+    double min,
+    double max,
+    Function(double) onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: Colors.white70),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                value.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: Colors.blue,
+            inactiveTrackColor: Colors.grey[700],
+            thumbColor: Colors.blue,
+            overlayColor: Colors.blue.withOpacity(0.2),
+            trackHeight: 4,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: title == 'Blur' ? 100 : 50,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 
@@ -497,23 +695,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
           Icon(icon, size: 30),
           const SizedBox(height: 4),
           Text(label, style: const TextStyle(fontSize: 12))
-        ],
-      ),
-    );
-  }
-
-  Widget _effectButton(String name, IconData icon) {
-    return InkWell(
-      onTap: () => _applyEffect(name.toLowerCase()),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 30),
-          const SizedBox(height: 4),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 12),
-          )
         ],
       ),
     );
@@ -646,49 +827,6 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         context,
         widget.mediaPath,
         filter,
-        (newPath) => setState(() => widget.mediaPath = newPath),
-      );
-    }
-  }
-
-  void _applyEffect(String effect) {
-    if (widget.isVideo) {
-      // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Applying effect to video...'),
-            ],
-          ),
-        ),
-      );
-
-      MediaEditorService.applyEffect(
-        mediaPath: widget.mediaPath,
-        effectType: effect,
-        isVideo: true,
-      ).then((newPath) {
-        Navigator.pop(context); // Close loading dialog
-        setState(() {
-          widget.mediaPath = newPath;
-        });
-        showSnackBar(context, 'Effect "$effect" applied to video');
-      }).catchError((error) {
-        Navigator.pop(context); // Close loading dialog
-        showSnackBar(context, 'Error applying effect: $error');
-        print('Video effect error: $error'); // For debugging
-      });
-    } else {
-      // Use ImageHandler method for images
-      _imageHandler.applyEffect(
-        context,
-        widget.mediaPath,
-        effect,
         (newPath) => setState(() => widget.mediaPath = newPath),
       );
     }

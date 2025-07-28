@@ -379,4 +379,71 @@ class ImageHandler {
       showSnackBar(context, 'Error applying effect: $e');
     }
   }
+
+  // Apply real-time effect preview (called from sliders)
+  Future<void> applyEffectPreview(
+    String imagePath,
+    Map<String, double> effects,
+    Function(String previewPath) onPreviewGenerated,
+  ) async {
+    try {
+      final previewPath = await MediaEditorService.generateEffectPreview(
+        mediaPath: imagePath,
+        effects: effects,
+        isVideo: false,
+      );
+      onPreviewGenerated(previewPath);
+    } catch (e) {
+      print('Error generating image effect preview: $e');
+    }
+  }
+
+  // Apply final effects to image
+  Future<void> applyFinalEffects(
+    BuildContext context,
+    String imagePath,
+    Map<String, double> effects,
+    Function(String newPath) onEffectApplied,
+  ) async {
+    try {
+      final newPath = await MediaEditorService.applyMultipleEffects(
+        mediaPath: imagePath,
+        effects: effects,
+        isVideo: false,
+      );
+      onEffectApplied(newPath);
+      showSnackBar(context, 'Effects applied to image successfully');
+    } catch (e) {
+      showSnackBar(context, 'Error applying effects: $e');
+    }
+  }
+
+  // Utility method to check if any effects are applied
+  bool hasEffectsApplied(Map<String, double> effects) {
+    return effects['blur'] != 0 ||
+        effects['brightness'] != 0 ||
+        effects['contrast'] != 1.0;
+  }
+
+  // Get effect description for UI
+  String getEffectDescription(Map<String, double> effects) {
+    List<String> descriptions = [];
+
+    if (effects['blur'] != null && effects['blur']! > 0) {
+      descriptions.add('Blur: ${effects['blur']!.toStringAsFixed(1)}');
+    }
+
+    if (effects['brightness'] != null && effects['brightness'] != 0) {
+      final sign = effects['brightness']! > 0 ? '+' : '';
+      descriptions.add(
+          'Brightness: $sign${(effects['brightness']! * 100).toStringAsFixed(0)}%');
+    }
+
+    if (effects['contrast'] != null && effects['contrast'] != 1.0) {
+      descriptions
+          .add('Contrast: ${(effects['contrast']! * 100).toStringAsFixed(0)}%');
+    }
+
+    return descriptions.isEmpty ? 'No effects' : descriptions.join(', ');
+  }
 }
