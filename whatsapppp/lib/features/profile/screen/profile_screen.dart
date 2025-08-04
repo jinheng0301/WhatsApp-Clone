@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whatsapppp/common/utils/color.dart';
+import 'package:whatsapppp/common/utils/utils.dart';
 import 'package:whatsapppp/common/widgets/error.dart';
 import 'package:whatsapppp/common/widgets/loader.dart';
 import 'package:whatsapppp/features/auth/controller/auth_controller.dart';
@@ -856,6 +857,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> loadUserData() async {
+    try {
+      // Show loading state briefly
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Invalidate and refresh user data
+      ref.invalidate(userDataAuthProvider);
+
+      // Invalidate and refresh media files
+      ref.invalidate(userMediaFilesProvider);
+      ref.invalidate(userVideoFilesProvider);
+
+      // Wait for the providers to reload
+      await Future.wait([
+        ref.read(userDataAuthProvider.future).catchError(
+              (_) => null,
+            ),
+        ref.read(userMediaFilesProvider.future).catchError(
+              (_) => <Map<String, dynamic>>[],
+            ),
+        ref.read(userVideoFilesProvider.future).catchError(
+              (_) => <Map<String, dynamic>>[],
+            ),
+      ]);
+
+      print('✅ Profile data refreshed successfully');
+    } catch (e) {
+      print('Error loading user data: $e');
+      // Handle error appropriately, e.g., show a snackbar or log it
+      if (mounted) {
+        showSnackBar(context, 'Failed to refresh data. Please try again.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -865,129 +901,137 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               return ErrorScreen(error: err.toString());
             },
             data: (user) {
-              return SingleChildScrollView(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: user?.profilePic ?? '',
-                            placeholder: (context, url) => const Loader(),
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.error,
-                              size: 50,
+              return RefreshIndicator(
+                onRefresh: loadUserData,
+                color: primaryColor,
+                backgroundColor: Colors.white,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: user?.profilePic ?? '',
+                              placeholder: (context, url) => const Loader(),
+                              errorWidget: (context, url, error) => const Icon(
+                                Icons.error,
+                                size: 50,
+                              ),
+                              fit: BoxFit.cover,
+                              height: 100,
+                              width: 100,
                             ),
-                            fit: BoxFit.cover,
-                            height: 100,
-                            width: 100,
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        Column(
-                          children: [
-                            Text(
-                              user?.name ?? 'No Name',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              user?.email ?? 'No email available',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              user?.phoneNumber ?? 'No phone number',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            )
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatsSection(ref),
-                        Divider(
-                          color: Colors.grey[300],
-                          thickness: 1,
-                          height: 40,
-                        ),
-                        Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  child: IconButton(
-                                    icon: Icon(
-                                      Icons.grid_on,
-                                      color: _page == 0
-                                          ? primaryColor
-                                          : secondaryColor,
-                                    ),
-                                    onPressed: () {
-                                      print('first button pressed');
-                                      ref
-                                          .read(selectedTabProvider.notifier)
-                                          .state = 'posts';
-                                      setState(() {
-                                        _page = 0;
-                                      });
-                                    },
-                                  ),
+                          const SizedBox(height: 20),
+                          Column(
+                            children: [
+                              Text(
+                                user?.name ?? 'No Name',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  child: IconButton(
-                                    icon: Icon(
-                                      Icons.tiktok,
-                                      color: _page == 1
-                                          ? primaryColor
-                                          : secondaryColor,
-                                    ),
-                                    onPressed: () {
-                                      print('second button pressed');
-                                      ref
-                                          .read(selectedTabProvider.notifier)
-                                          .state = 'videos';
-                                      setState(() {
-                                        _page = 1;
-                                      });
-                                    },
-                                  ),
+                              ),
+                              Text(
+                                user?.email ?? 'No email available',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
                                 ),
-                              ],
-                            )
-                          ],
-                        ),
-                        Divider(
-                          color: Colors.grey[300],
-                          thickness: 1,
-                          height: 40,
-                        ),
-                        Consumer(
-                          builder: (context, ref, child) {
-                            final selectedTab = ref.watch(selectedTabProvider);
+                              ),
+                              Text(
+                                user?.phoneNumber ?? 'No phone number',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              )
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          _buildStatsSection(ref),
+                          Divider(
+                            color: Colors.grey[300],
+                            thickness: 1,
+                            height: 40,
+                          ),
+                          Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        Icons.grid_on,
+                                        color: _page == 0
+                                            ? primaryColor
+                                            : secondaryColor,
+                                      ),
+                                      onPressed: () {
+                                        print('first button pressed');
+                                        ref
+                                            .read(selectedTabProvider.notifier)
+                                            .state = 'posts';
+                                        setState(() {
+                                          _page = 0;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        Icons.tiktok,
+                                        color: _page == 1
+                                            ? primaryColor
+                                            : secondaryColor,
+                                      ),
+                                      onPressed: () {
+                                        print('second button pressed');
+                                        ref
+                                            .read(selectedTabProvider.notifier)
+                                            .state = 'videos';
+                                        setState(() {
+                                          _page = 1;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              )
+                            ],
+                          ),
+                          Divider(
+                            color: Colors.grey[300],
+                            thickness: 1,
+                            height: 40,
+                          ),
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final selectedTab =
+                                  ref.watch(selectedTabProvider);
 
-                            if (selectedTab == 'posts') {
-                              return _buildImageGridSection(ref);
-                            } else if (selectedTab == 'videos') {
-                              return _buildVideoGridSection(ref);
-                            }
+                              if (selectedTab == 'posts') {
+                                return _buildImageGridSection(ref);
+                              } else if (selectedTab == 'videos') {
+                                return _buildVideoGridSection(ref);
+                              }
 
-                            return Container();
-                          },
-                        )
-                      ],
+                              return Container();
+                            },
+                          )
+                        ],
+                      ),
                     ),
                   ),
                 ),
