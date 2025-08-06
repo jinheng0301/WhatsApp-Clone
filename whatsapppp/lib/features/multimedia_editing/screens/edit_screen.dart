@@ -773,7 +773,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       context,
       widget.mediaPath,
       degrees,
-      (newPath) => setState(() => widget.mediaPath = newPath),
+      (newPath) {
+        setState(() => widget.mediaPath = newPath);
+        // Update preview panel immediately
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
+        showSnackBar(context, 'Image rotated successfully');
+      },
     );
   }
 
@@ -783,7 +788,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
     _imageHandler.showCropDialog(
       context,
       widget.mediaPath,
-      (newPath) => setState(() => widget.mediaPath = newPath),
+      (newPath) {
+        setState(() => widget.mediaPath = newPath);
+        // Update preview panel immediately
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
+        showSnackBar(context, 'Image cropped successfully');
+      },
     );
   }
 
@@ -815,11 +825,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         setState(() {
           widget.mediaPath = newPath;
         });
+        // Update preview panel immediately
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
         showSnackBar(context, 'Filter "$filter" applied to video');
       }).catchError((error) {
         Navigator.pop(context); // Close loading dialog
         showSnackBar(context, 'Error applying filter: $error');
-        print('Video filter error: $error'); // For debugging
       });
     } else {
       // Use ImageHandler method for images
@@ -827,7 +838,12 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         context,
         widget.mediaPath,
         filter,
-        (newPath) => setState(() => widget.mediaPath = newPath),
+        (newPath) {
+          setState(() => widget.mediaPath = newPath);
+          // Update preview panel immediately
+          _previewPanelKey.currentState?.updateMediaPath(newPath);
+          showSnackBar(context, 'Filter "$filter" applied');
+        },
       );
     }
   }
@@ -903,10 +919,11 @@ class _EditScreenState extends ConsumerState<EditScreen> {
       context,
       widget.mediaPath,
       (newPath) {
-        // Optionally switch to duplicated file or show info
         setState(() {
           widget.mediaPath = newPath;
         });
+        // Update preview panel immediately
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
         showSnackBar(context, 'Video duplicated successfully');
       },
     );
@@ -922,6 +939,8 @@ class _EditScreenState extends ConsumerState<EditScreen> {
         setState(() {
           widget.mediaPath = newPath;
         });
+        // Update preview panel immediately
+        _previewPanelKey.currentState?.updateMediaPath(newPath);
         showSnackBar(context, 'Image duplicated successfully');
       },
     );

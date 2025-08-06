@@ -158,8 +158,31 @@ class PreviewPanelState extends State<PreviewPanel> {
       _currentMediaPath = newPath;
     });
 
+    // Check if the new file is a video (handles dynamic conversion)
+    final isVideoFile = newPath.toLowerCase().endsWith('.mp4') ||
+        newPath.toLowerCase().endsWith('.mov') ||
+        newPath.toLowerCase().endsWith('.avi') ||
+        newPath.toLowerCase().endsWith('.mkv');
+
+    if (isVideoFile && !_isDynamicVideo) {
+      _isDynamicVideo = true;
+    }
+
+    // Reinitialize video player if it's a video
     if (widget.isVideo || _isDynamicVideo) {
       _reinitializeVideoPlayer(newPath);
+    } else {
+      // For images, just trigger a rebuild to show the new image
+      setState(() {});
+    }
+  }
+
+  // Add method to refresh preview without changing paths (for overlay updates)
+  void refreshPreview() {
+    if (mounted) {
+      setState(() {
+        // Force rebuild to reflect overlay changes
+      });
     }
   }
 
@@ -1189,6 +1212,8 @@ class PreviewPanelState extends State<PreviewPanel> {
     return Center(
       child: Image.file(
         File(_currentMediaPath),
+        key: ValueKey(
+            _currentMediaPath), // Add key to force rebuild on path change
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
           return const Center(
