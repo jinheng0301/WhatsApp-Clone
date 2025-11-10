@@ -269,57 +269,47 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     final messageReply = ref.watch(messageReplyProvider);
     final isShowMessageReply = (messageReply != null);
 
-    return Column(
-      children: [
-        isShowMessageReply ? const MessageReplyPreview() : const SizedBox(),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                focusNode: focusNode,
-                controller: messageController,
-                onChanged: (value) {
-                  if (value.isNotEmpty) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize:
+            MainAxisSize.min, // 👈 prevents overflow when keyboard/emoji appear
+        children: [
+          if (isShowMessageReply) const MessageReplyPreview(),
+
+          // Chat input row
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  focusNode: focusNode,
+                  controller: messageController,
+                  onChanged: (value) {
                     setState(() {
-                      isShowSendButton = true;
+                      isShowSendButton = value.isNotEmpty;
                     });
-                  } else {
-                    setState(() {
-                      isShowSendButton = false;
-                    });
-                  }
-                },
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: mobileChatBoxColor,
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: SizedBox(
-                      width: 100,
+                  },
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: mobileChatBoxColor,
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             onPressed: toggleEmojiKeyboardContainer,
-                            icon: const Icon(
-                              Icons.emoji_emotions,
-                              color: Colors.grey,
-                            ),
+                            icon: const Icon(Icons.emoji_emotions,
+                                color: Colors.grey),
                           ),
                           IconButton(
                             onPressed: selectGIF,
-                            icon: const Icon(
-                              Icons.gif,
-                              color: Colors.grey,
-                            ),
+                            icon: const Icon(Icons.gif, color: Colors.grey),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  suffixIcon: SizedBox(
-                    width: 100,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           onPressed: selectImage,
@@ -344,66 +334,59 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                         ),
                       ],
                     ),
+                    hintText: 'Type a message!',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(10),
                   ),
-                  hintText: 'Type a message!',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20.0),
-                    borderSide: const BorderSide(
-                      width: 0,
-                      style: BorderStyle.none,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, right: 2, left: 2),
+                child: CircleAvatar(
+                  backgroundColor:
+                      isRecording ? Colors.red : const Color(0xFF128C7E),
+                  radius: 25,
+                  child: InkWell(
+                    onTap: sendTextMessage,
+                    child: Icon(
+                      isShowSendButton
+                          ? Icons.send
+                          : isRecording
+                              ? Icons.close
+                              : Icons.mic,
+                      color: Colors.white,
                     ),
                   ),
-                  contentPadding: const EdgeInsets.all(10),
                 ),
               ),
-            ),
+            ],
+          ),
 
-            // recording
-            Padding(
-              padding: const EdgeInsets.only(
-                bottom: 8,
-                right: 2,
-                left: 2,
-              ),
-              child: CircleAvatar(
-                backgroundColor:
-                    isRecording ? Colors.red : const Color(0xFF128C7E),
-                radius: 25,
-                child: InkWell(
-                  onTap: sendTextMessage,
-                  child: Icon(
-                    isShowSendButton
-                        ? Icons.send
-                        : isRecording
-                            ? Icons.close
-                            : Icons.mic,
-                    color: Colors.white,
-                  ),
-                ),
+          // 👇 Wrap emoji picker inside AnimatedContainer to prevent overflow
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: isShowEmojiContainer ? 310 : 0,
+            child: Offstage(
+              offstage: !isShowEmojiContainer,
+              child: EmojiPicker(
+                onEmojiSelected: (category, emoji) {
+                  setState(() {
+                    messageController.text += emoji.emoji;
+                  });
+                  if (!isShowSendButton) {
+                    setState(() {
+                      isShowSendButton = true;
+                    });
+                  }
+                },
               ),
             ),
-          ],
-        ),
-        isShowEmojiContainer
-            ? SizedBox(
-                height: 310,
-                child: EmojiPicker(
-                  onEmojiSelected: (category, emoji) {
-                    setState(() {
-                      // Add the selected emoji to the message
-                      messageController.text =
-                          messageController.text + emoji.emoji;
-                    });
-                    if (!isShowSendButton) {
-                      setState(() {
-                        isShowSendButton = true;
-                      });
-                    }
-                  },
-                ),
-              )
-            : const SizedBox(),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }
