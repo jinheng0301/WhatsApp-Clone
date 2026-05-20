@@ -37,7 +37,7 @@ class UserModel {
       isOnline: map['isOnline'] ?? false,
       email: map['email'] ?? '',
       phoneNumber: map['phoneNumber'] ?? '',
-      groupId: List<String>.from(map['groupId']),
+      groupId: map['groupId'] != null ? List<String>.from(map['groupId']) : [],
     );
   }
 }
